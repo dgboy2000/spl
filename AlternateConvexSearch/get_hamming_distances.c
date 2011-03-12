@@ -117,7 +117,7 @@ int main(int argc, char* argv[]) {
     count = count*(count-1)/2;
 
     double avgHD = ((double) sum)/count;
-    printf("\n%f\n",avgHD); fflush(stdout);
+    printf("%f\n",avgHD); fflush(stdout);
     fprintf(saveFile,"%f\n",avgHD); fflush(saveFile);
   }
 }

@@ -168,6 +168,7 @@ void init_latent_variables(SAMPLE *sample, LEARN_PARM *lparm, STRUCTMODEL *sm, S
   }
 }
 
+
 SVECTOR *psi(PATTERN x, LABEL y, LATENT_VAR h, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
 /*
   Creates the feature vector \Psi(x,y,h) and return a pointer to 
@@ -230,6 +231,30 @@ SVECTOR *psi(PATTERN x, LABEL y, LATENT_VAR h, STRUCTMODEL *sm, STRUCT_LEARN_PAR
 
   return(fvec);
 }
+
+SVECTOR **get_all_psi(EXAMPLE *ex, int exNum, int *numPairs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+  long i;
+  int nMotifPositions = ex[exNum].x.length-sparm->motif_length-sparm->bg_markov_order;
+  int nPairs = nMotifPositions + 1;
+  *numPairs = nPairs;
+
+  LABEL y;
+  LATENT_VAR h;
+  
+  SVECTOR **vecs = malloc(sizeof(SVECTOR *)*nPairs);
+  for(i=0;i<nMotifPositions;i++) {
+    y.label = 1;
+    h.position = i;
+    vecs[i] = psi(ex[exNum].x,y,h,sm,sparm);
+  }
+  
+  y.label = -1;
+  h.position = -1;
+  vecs[i] = psi(ex[exNum].x,y,h,sm,sparm);
+
+  return vecs;
+}
+
 
 void classify_struct_example(PATTERN x, LABEL *y, LATENT_VAR *h, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
 /*
@@ -346,7 +371,6 @@ int get_latent_variable_scores(PATTERN x, LABEL y, double *scores, STRUCTMODEL *
   }
 }
 
-
 LATENT_VAR infer_latent_variables(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
 /*
   Complete the latent variable h for labeled examples, i.e.,
@@ -405,6 +429,22 @@ double loss(LABEL y, LABEL ybar, LATENT_VAR hbar, STRUCT_LEARN_PARM *sparm) {
   } else {
     return(1);
   }
+}
+
+void get_all_losses(EXAMPLE *ex, int exNum, double *losses, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+  long i;
+  int nMotifPositions = ex[exNum].x.length-sparm->motif_length-sparm->bg_markov_order;
+  int nPairs = nMotifPositions + 1;
+
+  LABEL y;
+  LATENT_VAR h;
+  for(i=0;i<nMotifPositions;i++) {
+    y.label = 1;
+    losses[i] = loss(ex[exNum].y,y,h,sparm);
+  }
+  
+  y.label = -1;
+  losses[i] = loss(ex[exNum].y,y,h,sparm);
 }
 
 void write_struct_model(char *file, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {

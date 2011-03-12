@@ -25,6 +25,7 @@
 #include <math.h>
 #include "svm_struct_latent_api.h"
 #include "./svm_light/svm_learn.h"
+//#include "mosek_api.h"
 
 
 #define ALPHA_THRESHOLD 1E-14
@@ -673,6 +674,47 @@ int check_acs_convergence(int *prev_valid_examples, int *valid_examples, long m)
 	return nValid;
 }*/
 
+double *convert_from_svector(SVECTOR *svec,int size) {
+  double *v = malloc(sizeof(double)*size);
+  SVECTOR *f;
+  long j;  
+  for (f=svec;f;f=f->next) {
+		j = 0;
+		while (1) {
+			if(!f->words[j].wnum)
+				break;
+      v[f->words[j].wnum] = f->words[j].weight;
+      j++;
+		}
+	}
+
+  return v;
+}
+
+double get_novelty(EXAMPLE *ex, long exNum, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+  long j;
+  SVECTOR *psi_h_star_sparse = psi(ex[exNum].x, ex[exNum].y, ex[exNum].h, sm, sparm);
+  double *psi_h_star = convert_from_svector(psi_h_star_sparse,sm->sizePsi);
+  int numPairs;  
+  SVECTOR **psi_h_y_hats_sparse = get_all_psi(ex, exNum, &numPairs, sm, sparm);
+  double **psi_h_y_hats = malloc(numPairs*sizeof(double *));
+  for(j=0;j<numPairs;j++) {
+    psi_h_y_hats[j] = convert_from_svector(psi_h_y_hats_sparse[j],sm->sizePsi);
+  }
+  double losses[numPairs];
+  get_all_losses(ex, exNum, losses, sm, sparm);
+  
+  //double novelty = compute_delta_w(sm->w,psi_h_star,psi_h_y_hats,losses,sm->sizePsi,numPairs);
+
+  for(j=0;j<numPairs;j++) {
+    free_svector(psi_h_y_hats_sparse[j]);
+  }  
+  free_svector(psi_h_star_sparse);  
+  free(psi_h_y_hats_sparse);
+  free(psi_h_star);
+  free(psi_h_y_hats);
+  return 0;
+}
 
 double get_entropy(double *distrib, int numEntries) {
   int k;
@@ -689,30 +731,22 @@ double get_entropy(double *distrib, int numEntries) {
 	return(entropy);
 }
 
-int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPLE *ex, 
-													STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight) {
-
+sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex, 
+													STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
 	long i, j;
   int numPositions;
-	double difficulty, lossval, uncertainty, *hvScores, scoreSum;
-	double difficultyWeight = 1.0-sparm->uncertainty_weight;
+	double difficulty, lossval, uncertainty, novelty, *hvScores, scoreSum;
+
 	double uncertaintyWeight = sparm->uncertainty_weight;
-  double Asigm = -1.5;
+  double noveltyWeight = sparm->novelty_weight;
+  double difficultyWeight = 1.0-uncertaintyWeight-noveltyWeight;
+  double Asigm = -1.5; /* param for fitting sigmoid to turn h scores into probabilities */
 
-	/* if self-paced learning weight is non-positive, all examples are valid */
-	if(spl_weight <= 0.0) {
-		for (i=0;i<m;i++)
-			valid_examples[i] = 1;
-		return (m);
-	}
-
-	sortStruct *exampleScores = (sortStruct *) malloc(m*sizeof(sortStruct));
+  sortStruct *exampleScores = (sortStruct *) malloc(m*sizeof(sortStruct));
 	LABEL ybar;
 	LATENT_VAR hbar;
 	SVECTOR *f, *fy, *fybar;
-	double penalty = 1.0/spl_weight;
-	if(penalty < 0.0)
-		penalty = DBL_MAX;
+
 
 	for (i=0;i<m;i++) {		
 		find_most_violated_constraint_marginrescaling(ex[i].x, ex[i].y, &ybar, &hbar, sm, sparm);
@@ -720,7 +754,7 @@ int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPL
 		fybar = psi(ex[i].x,ybar,hbar,sm,sparm);
 		exampleScores[i].index = i;
 		lossval = loss(ex[i].y,ybar,hbar,sparm);
-		difficulty = 0;
+		difficulty = 0.0;
 		
 		for (f=fy;f;f=f->next) {
 			j = 0;
@@ -759,13 +793,38 @@ int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPL
     } else {
       uncertainty = 0.0;    
     }
+
+    if(noveltyWeight) {
+      novelty = get_novelty(ex,i,sm,sparm);
+    } else {
+      novelty = 0.0;    
+    }
     //printf("Example %d, difficulty %.4f, uncertainty %.4f, loss %.4f\n",i,difficulty,uncertainty,lossval);
-		exampleScores[i].val = lossval + difficultyWeight * difficulty + uncertaintyWeight * uncertainty;
+		exampleScores[i].val = lossval + difficultyWeight * difficulty + uncertaintyWeight * uncertainty + noveltyWeight * novelty; //score!!
 		free_svector(fy);
 		free_svector(fybar);
 	}
 
 	qsort(exampleScores,m,sizeof(sortStruct),&compar);
+  return(exampleScores);
+}
+
+int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPLE *ex, 
+													STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight) {
+
+  long i;
+	/* if self-paced learning weight is non-positive, all examples are valid */
+	if(spl_weight <= 0.0) {
+		for (i=0;i<m;i++)
+			valid_examples[i] = 1;
+		return (m);
+	}
+
+	sortStruct *exampleScores = get_example_scores(m, C, fycache, ex, sm, sparm);
+
+  double penalty = 1.0/spl_weight;
+	if(penalty < 0.0)
+		penalty = DBL_MAX;
 
 	int nValid = 0;
 	for (i=0;i<m;i++)
@@ -787,75 +846,14 @@ int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPL
 double get_init_spl_weight(long m, double C, SVECTOR **fycache, EXAMPLE *ex, 
 													 STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
 
-	long i, j;
-  int numPositions;
-	double difficulty, lossval, uncertainty, *hvScores, scoreSum;
-	double difficultyWeight = 1.0-sparm->uncertainty_weight;
-	double uncertaintyWeight = sparm->uncertainty_weight;
-  double Asigm = -1.5;
-
-	sortStruct *exampleScores = (sortStruct *) malloc(m*sizeof(sortStruct));
-	LABEL ybar;
-	LATENT_VAR hbar;
-	SVECTOR *f, *fy, *fybar;
-
-	double init_spl_weight;
-	int half, halfPos, numPos;
-
-	for (i=0;i<m;i++) {
-		find_most_violated_constraint_marginrescaling(ex[i].x, ex[i].y, &ybar, &hbar, sm, sparm);
-		fy = copy_svector(fycache[i]);
-		fybar = psi(ex[i].x,ybar,hbar,sm,sparm);
-		exampleScores[i].index = i;
-		lossval = loss(ex[i].y,ybar,hbar,sparm);
-    difficulty = 0;
-		for (f=fy;f;f=f->next) {
-			j = 0;
-			while (1) {
-				if(!f->words[j].wnum)
-					break;
-				difficulty -= sm->w[f->words[j].wnum]*f->words[j].weight;
-				j++;
-			}
-		}
-		for (f=fybar;f;f=f->next) {
-			j = 0;
-			while (1) {
-				if(!f->words[j].wnum)
-					break;
-				difficulty += sm->w[f->words[j].wnum]*f->words[j].weight;
-				j++;
-			}
-		}
-
-    if(uncertaintyWeight) {
-      numPositions = get_num_latent_variable_options(ex[i].x, ex[i].y, sm, sparm);
-      hvScores = malloc(numPositions * sizeof(double));
-      get_latent_variable_scores(ex[i].x, ex[i].y, hvScores, sm, sparm);
-      
-      scoreSum = 0.0;
-      for(j = 0; j < numPositions; j++) {
-        hvScores[j] = 1/(1+exp(Asigm*hvScores[j]));
-        scoreSum += hvScores[j];
-      }
-      for(j = 0; j < numPositions; j++) {
-        hvScores[j] /= scoreSum;
-      }
-
-      uncertainty = get_entropy(hvScores, numPositions);
-    } else {
-      uncertainty = 0.0;    
-    }
-    //printf("Example %d, difficulty %.4f, uncertainty %.4f, loss %.4f\n",i,difficulty,uncertainty,lossval);
-		exampleScores[i].val = lossval + difficultyWeight * difficulty + uncertaintyWeight * uncertainty;
-    //printf("Slack %d: %f\n",i,slack[i].val);
-		free_svector(fy);
-		free_svector(fybar);
-	}
-	qsort(exampleScores,m,sizeof(sortStruct),&compar);
+	sortStruct *exampleScores = get_example_scores(m, C, fycache, ex, sm, sparm);
+  
+  long i;
+  int half, halfPos, numPos;
+  double uncertaintyWeight = sparm->uncertainty_weight;
 
 	half = (int) round(sparm->init_valid_fraction*m);
-	init_spl_weight = (double)m/C/exampleScores[half].val;
+	double init_spl_weight = (double)m/C/exampleScores[half].val;
 
   if(uncertaintyWeight) {
     halfPos = (int) round(sparm->init_valid_fraction*m/2); //half of positive examples
@@ -1210,10 +1208,6 @@ int main(int argc, char* argv[]) {
     	}
 			latent_update++;
 		}
-
-    //double avgHD = compute_average_hamming_distance(ex,m,valid_examples,&sparm);
-    //printf("Average Hamming Distance: %f\n", avgHD);
-    //fprintf(fhamming,"%f \n",avgHD); fflush(flatent);
   
     /* re-compute feature vector cache */
     for (i=0;i<m;i++) {
@@ -1296,6 +1290,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
 	struct_parm->optimizer_type = 0; /* default: cutting plane, change to 1 for stochastic subgradient descent*/
 	struct_parm->init_valid_fraction = 0.5;
   struct_parm->uncertainty_weight = 0.0;
+  struct_parm->novelty_weight = 0.0;
 
   struct_parm->custom_argc=0;
 
@@ -1315,6 +1310,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
 		case 'o': i++; struct_parm->optimizer_type = atoi(argv[i]); break;
 		case 'f': i++; struct_parm->init_valid_fraction = atof(argv[i]); break;
     case 'u': i++; struct_parm->uncertainty_weight = atof(argv[i]); break;
+    case 'v': i++; struct_parm->novelty_weight = atof(argv[i]); break;
     case '-': strcpy(struct_parm->custom_argv[struct_parm->custom_argc++],argv[i]);i++; strcpy(struct_parm->custom_argv[struct_parm->custom_argc++],argv[i]);break; 
     default: printf("\nUnrecognized option %s!\n\n",argv[i]);
       exit(0);

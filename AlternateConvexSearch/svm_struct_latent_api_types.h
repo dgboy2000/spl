@@ -97,5 +97,6 @@ typedef struct struct_learn_parm {
 	int optimizer_type;
 	double init_valid_fraction;
   double uncertainty_weight;
+  double novelty_weight;
 } STRUCT_LEARN_PARM;
 
