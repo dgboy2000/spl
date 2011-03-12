@@ -25,7 +25,7 @@
 #include <math.h>
 #include "svm_struct_latent_api.h"
 #include "./svm_light/svm_learn.h"
-//#include "mosek_api.h"
+#include "mosek_api.h"
 
 
 #define ALPHA_THRESHOLD 1E-14
@@ -704,7 +704,7 @@ double get_novelty(EXAMPLE *ex, long exNum, STRUCTMODEL *sm, STRUCT_LEARN_PARM *
   double losses[numPairs];
   get_all_losses(ex, exNum, losses, sm, sparm);
   
-  //double novelty = compute_delta_w(sm->w,psi_h_star,psi_h_y_hats,losses,sm->sizePsi,numPairs);
+  double novelty = compute_delta_w(sm->w,psi_h_star,psi_h_y_hats,losses,sm->sizePsi,numPairs);
 
   for(j=0;j<numPairs;j++) {
     free_svector(psi_h_y_hats_sparse[j]);
@@ -713,7 +713,7 @@ double get_novelty(EXAMPLE *ex, long exNum, STRUCTMODEL *sm, STRUCT_LEARN_PARM *
   free(psi_h_y_hats_sparse);
   free(psi_h_star);
   free(psi_h_y_hats);
-  return 0;
+  return novelty;
 }
 
 double get_entropy(double *distrib, int numEntries) {

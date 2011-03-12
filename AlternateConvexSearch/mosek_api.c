@@ -5,6 +5,7 @@
 #include "./SFMT-src-1.3.3/SFMT.h"
 #include "mosek_api.h"
 #include "mosek.h"
+#include "math.h"
 
 #define MAX_INPUT_LINE_LENGTH 10000
 
@@ -21,6 +22,9 @@ static void MSKAPI printstr(void *handle,
   printf("%s",str);
 } /* printstr */
 
+/* Compute the L2 norm of the vector */
+static double vector_norm (double *a, int n);
+
 static void
 compute_qp_params (double *phi_h_star, /* \Phi(x, y, h_star) */
                    double **phi_y_h_hat /* phi_y_h_hat[i] is the value of \phi for the i-th y_hat, h_hat pair */,
@@ -35,53 +39,52 @@ compute_qp_params (double *phi_h_star, /* \Phi(x, y, h_star) */
                    MSKidxt **asub_save,
                    double **aval_save,
                    
-                   double **blc_save,
-                   
-                   int *num_nonzero_save);
+                   double **blc_save);
 
-double *compute_delta_w (double *w /* Vector of feature weights */,
-                         double *phi_h_star /* \Phi(x, y, h_star) */ ,
-                         double **phi_y_h_hat /* phi_y_h_hat[i] is the value of \phi for the i-th y_hat, h_hat pair */,
-                         double *y_loss, /* Vector of \Delta(y, y_hat) values */
-                         int num_features, /* Size of w */
-                         int num_pairs /* Number of y_hat/h_hat pairs */)
+double compute_delta_w (double *w /* Vector of feature weights */,
+                        double *phi_h_star /* \Phi(x, y, h_star) */ ,
+                        double **phi_y_h_hat /* phi_y_h_hat[i] is the value of \phi for the i-th y_hat, h_hat pair */,
+                        double *y_loss, /* Vector of \Delta(y, y_hat) values */
+                        int num_features, /* Size of w */
+                        int num_pairs /* Number of y_hat/h_hat pairs */)
 {
   
   
   
   double        c[]   = {0.0,-1.0,0.0};
 
-  MSKboundkeye  bkc[] = {MSK_BK_LO};
-  double        blc[] = {1.0};
-  double        buc[] = {+MSK_INFINITY};
+  MSKboundkeye  *bkc = malloc (sizeof (MSKboundkeye) * num_pairs);
+	double        *buc = malloc (sizeof (double) * num_pairs);
+  double        *blc;
                          
-  MSKboundkeye  bkx[] = malloc ((sizeof MSKboundkeye) * num_pairs);
-  double        bux[] = malloc ((sizeof double) * num_pairs);
-  for (int i=0; i<num_pairs; ++i)
-    {
-      bkx[i] = MSK_BK_LO;
-      bux[i] = +MSK_INFINITY;
-    }
-                         
-  double        blx[];
+  // MSKboundkeye  *bkx = malloc (sizeof (MSKboundkeye) * num_pairs);
+  // double        *bux = malloc (sizeof (double) * num_pairs);
+  // double        *blx;
   
-  MSKintt       aptrb[];
-  MSKintt       aptre[];
-  MSKidxt       asub[];
-  double        aval[];
+  MSKintt       *aptrb;
+  MSKintt       *aptre;
+  MSKidxt       *asub;
+  double        *aval;
                        
-  MSKidxt       qsubi[] = malloc ((sizeof MSKidxt) * num_features);
-  MSKidxt       qsubj[] = malloc ((sizeof MSKidxt) * num_features);
-  double        qval[] = malloc ((sizeof double) * num_features);
-  for (int i=0; i<num_features; ++i)
+  MSKidxt       *qsubi = malloc (sizeof (MSKidxt) * num_features);
+  MSKidxt       *qsubj = malloc (sizeof (MSKidxt) * num_features);
+  double        *qval = malloc (sizeof (double) * num_features);
+  
+  MSKidxt       i,j;
+  double        *xx = malloc (sizeof (double) * num_features);
+
+  for (i=0; i<num_pairs; ++i)
+    {
+      bkc[i] = MSK_BK_LO;
+      buc[i] = +MSK_INFINITY;
+    }
+
+  for (i=0; i<num_features; ++i)
     {
       qsubi[i] = i;
       qsubj[i] = i;
       qval[i] = 1;
     }
-  
-  MSKidxt       i,j;
-  double        xx[num_features];
 
   MSKenv_t      env;
   MSKtask_t     task;
@@ -287,23 +290,27 @@ double *compute_delta_w (double *w /* Vector of feature weights */,
   free (asub);
   free (aval);
 
-  free (bkx);
-  free (bux);
+  free (bkc);
+  free (buc);
+  free (blc);
   
   free (qsubi);
   free (qsubj);
   free (qval);
 
-  return (r);
-  
+	double delta_w = vector_norm (xx, num_features);
+	free (xx);
+
+  return delta_w;
 }
 
 /* Computes vector difference a-b, a vector of size n */
 static double *
 vector_diff (double *a, double *b, int n)
 {
-  double *c = malloc ((sizeof double) * n);
-  for (int i=0; i<n; ++i) {
+  double *c = malloc (sizeof (double) * n);
+	int i;
+  for (i=0; i<n; ++i) {
     c[i] = a[i]-b[i];
   }
   return c;
@@ -314,9 +321,25 @@ static double
 dot_product (double *a, double *b, int n)
 {
   double c = 0;
-  for (int i=0; i<n; ++i)
+	int i;
+  for (i=0; i<n; ++i)
     c += a[i] * b[i];
   return c;
+}
+
+/* Compute the L2 norm of the vector */
+static double
+vector_norm (double *a, int n)
+{
+	double norm_sq = 0;
+	double elt;
+	int i;
+	for (i=0; i<n; ++i)
+		{
+			elt = a[i];
+			norm_sq += elt * elt;
+		}
+	return sqrt(norm_sq);
 }
 
 static void
@@ -333,43 +356,42 @@ compute_qp_params (double *phi_h_star, /* \Phi(x, y, h_star) */
                    MSKidxt **asub_save,
                    double **aval_save,
                    
-                   double **blc_save,
-                   
-                   int *num_nonzero_save)
+                   double **blc_save)
 {
-  MSKintt       aptrb[];
-  MSKintt       aptre[];
-  MSKidxt       asub[];
-  double        aval[];
-  
-  double        blc[];
+  MSKintt       *aptrb;
+  MSKintt       *aptre;
+  MSKidxt       *asub;
+  double        *aval;
+                
+  double        *blc;
   
   int num_nonzero = 0;
-  for (int i=0; i<num_pairs; ++i)
-    for (int j=0; j<num_features; ++j)
+	int i,j;
+  for (i=0; i<num_pairs; ++i)
+    for (j=0; j<num_features; ++j)
       if (phi_h_star[j] != phi_y_h_hat[i][j])
         ++num_nonzero;
         
-  aptrb = malloc ((sizeof int) * num_features);
-  aptre = malloc ((sizeof int) * num_features);
-  asub = malloc ((sizeof int) * num_nonzero);
-  aval = malloc ((sizeof double) * num_nonzero);
+  aptrb = malloc (sizeof (int) * num_features);
+  aptre = malloc (sizeof (int) * num_features);
+  asub = malloc (sizeof (int) * num_nonzero);
+  aval = malloc (sizeof (double) * num_nonzero);
   
-  blc = malloc ((sizeof double) * num_pairs);
+  blc = malloc (sizeof (double) * num_pairs);
   
   int nz_ind = 0;
   double *tmp_vector;
   
   /* Compute sparse constraint matrix. The i-th row is the i-th pair's feature vector diff. */
-  for (int i=0; i<num_pairs; ++i)
+  for (i=0; i<num_pairs; ++i)
     {
       aptrb[i] = nz_ind;
       
-      tmp_vector = vector_diff (phi_y_h_hat[i], phi_h_star);
-      blc[i] = y_loss[i] + dot_product (tmp_vector, w);
+      tmp_vector = vector_diff (phi_y_h_hat[i], phi_h_star, num_features);
+      blc[i] = y_loss[i] + dot_product (tmp_vector, w, num_features);
       free (tmp_vector);
       
-      for (int j=0; j<num_features; ++j)
+      for (j=0; j<num_features; ++j)
         {
           
           if (phi_h_star[j] != phi_y_h_hat[i][j])
