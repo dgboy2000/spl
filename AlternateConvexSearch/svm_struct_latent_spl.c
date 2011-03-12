@@ -43,7 +43,7 @@
 
 int mosek_qp_optimize(double**, double*, double*, long, double, double*);
 
-void my_read_input_parameters(int argc, char* argv[], char *trainfile, char *modelfile, char *examplesfile, char *timefile, char *latentfile,
+void my_read_input_parameters(int argc, char* argv[], char *trainfile, char *modelfile, char *examplesfile, char *timefile, char *latentfile, char *hammingfile,
 			      LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm, 
 						double *init_spl_weight, double *spl_factor);
 
@@ -570,12 +570,6 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
 			size_active = resize_cleanup(size_active, &idle, &alpha, &delta, &dXc, &G, &mv_iter);
 		}
 
-		/*
-		if(!(iter%1)) {
-			printf("%f\n",current_obj_val(ex, fycache, m, sm, sparm, C, valid_examples));
-		}
-		*/
-
  	} // end cutting plane while loop 
 
 	primal_obj = current_obj_val(ex, fycache, m, sm, sparm, C, valid_examples);
@@ -614,12 +608,12 @@ int check_acs_convergence(int *prev_valid_examples, int *valid_examples, long m)
 	return converged;
 }
 
-int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPLE *ex, 
+/*int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPLE *ex, 
 													STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight) {
 
 	long i, j;
 
-	/* if self-paced learning weight is non-positive, all examples are valid */
+	/* if self-paced learning weight is non-positive, all examples are valid 
 	if(spl_weight <= 0.0) {
 		for (i=0;i<m;i++)
 			valid_examples[i] = 1;
@@ -677,32 +671,63 @@ int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPL
 	free(slack);
 
 	return nValid;
+}*/
+
+
+double get_entropy(double *distrib, int numEntries) {
+  int k;
+  double p, entropy;
+  
+  entropy = 0.0;
+  for(k=0;k<numEntries;k++) {
+      p = distrib[k];
+      if(p) {
+	      entropy += p*log(p);
+      }
+  } 
+  entropy *= -1;   
+	return(entropy);
 }
 
-double get_init_spl_weight(long m, double C, SVECTOR **fycache, EXAMPLE *ex, 
-													 STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPLE *ex, 
+													STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight) {
 
 	long i, j;
+  int numPositions;
+	double difficulty, lossval, uncertainty, *hvScores, scoreSum;
+	double difficultyWeight = 1.0-sparm->uncertainty_weight;
+	double uncertaintyWeight = sparm->uncertainty_weight;
+  double Asigm = -1.5;
 
-	sortStruct *slack = (sortStruct *) malloc(m*sizeof(sortStruct));
+	/* if self-paced learning weight is non-positive, all examples are valid */
+	if(spl_weight <= 0.0) {
+		for (i=0;i<m;i++)
+			valid_examples[i] = 1;
+		return (m);
+	}
+
+	sortStruct *exampleScores = (sortStruct *) malloc(m*sizeof(sortStruct));
 	LABEL ybar;
 	LATENT_VAR hbar;
 	SVECTOR *f, *fy, *fybar;
-	double lossval, init_spl_weight;
-	int half;
+	double penalty = 1.0/spl_weight;
+	if(penalty < 0.0)
+		penalty = DBL_MAX;
 
-	for (i=0;i<m;i++) {
+	for (i=0;i<m;i++) {		
 		find_most_violated_constraint_marginrescaling(ex[i].x, ex[i].y, &ybar, &hbar, sm, sparm);
 		fy = copy_svector(fycache[i]);
 		fybar = psi(ex[i].x,ybar,hbar,sm,sparm);
-		slack[i].index = i;
-		slack[i].val = loss(ex[i].y,ybar,hbar,sparm);
+		exampleScores[i].index = i;
+		lossval = loss(ex[i].y,ybar,hbar,sparm);
+		difficulty = 0;
+		
 		for (f=fy;f;f=f->next) {
 			j = 0;
 			while (1) {
 				if(!f->words[j].wnum)
 					break;
-				slack[i].val -= sm->w[f->words[j].wnum]*f->words[j].weight;
+				difficulty -= sm->w[f->words[j].wnum]*f->words[j].weight;
 				j++;
 			}
 		}
@@ -711,20 +736,140 @@ double get_init_spl_weight(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
 			while (1) {
 				if(!f->words[j].wnum)
 					break;
-				slack[i].val += sm->w[f->words[j].wnum]*f->words[j].weight;
+				difficulty += sm->w[f->words[j].wnum]*f->words[j].weight;
 				j++;
 			}
 		}
-//printf("Slack %d: %f\n",i,slack[i].val);
+    
+    if(uncertaintyWeight) {
+      numPositions = get_num_latent_variable_options(ex[i].x, ex[i].y, sm, sparm);
+      hvScores = malloc(numPositions * sizeof(double));
+      get_latent_variable_scores(ex[i].x, ex[i].y, hvScores, sm, sparm);
+      
+      scoreSum = 0.0;
+      for(j = 0; j < numPositions; j++) {
+        hvScores[j] = 1/(1+exp(Asigm*hvScores[j]));
+        scoreSum += hvScores[j];
+      }
+      for(j = 0; j < numPositions; j++) {
+        hvScores[j] /= scoreSum;
+      }
+
+      uncertainty = get_entropy(hvScores, numPositions);
+    } else {
+      uncertainty = 0.0;    
+    }
+    //printf("Example %d, difficulty %.4f, uncertainty %.4f, loss %.4f\n",i,difficulty,uncertainty,lossval);
+		exampleScores[i].val = lossval + difficultyWeight * difficulty + uncertaintyWeight * uncertainty;
 		free_svector(fy);
 		free_svector(fybar);
 	}
-	qsort(slack,m,sizeof(sortStruct),&compar);
+
+	qsort(exampleScores,m,sizeof(sortStruct),&compar);
+
+	int nValid = 0;
+	for (i=0;i<m;i++)
+		valid_examples[i] = 0;
+	for (i=0;i<m;i++) {
+		if(exampleScores[i].val*C/m > penalty)
+			break;
+		valid_examples[exampleScores[i].index] = 1;
+    //printf("%d ",ex[exampleScores[i].index].y.label);
+
+		nValid++;
+	}
+  //printf("\n");
+	free(exampleScores);
+
+	return nValid;
+}
+
+double get_init_spl_weight(long m, double C, SVECTOR **fycache, EXAMPLE *ex, 
+													 STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+
+	long i, j;
+  int numPositions;
+	double difficulty, lossval, uncertainty, *hvScores, scoreSum;
+	double difficultyWeight = 1.0-sparm->uncertainty_weight;
+	double uncertaintyWeight = sparm->uncertainty_weight;
+  double Asigm = -1.5;
+
+	sortStruct *exampleScores = (sortStruct *) malloc(m*sizeof(sortStruct));
+	LABEL ybar;
+	LATENT_VAR hbar;
+	SVECTOR *f, *fy, *fybar;
+
+	double init_spl_weight;
+	int half, halfPos, numPos;
+
+	for (i=0;i<m;i++) {
+		find_most_violated_constraint_marginrescaling(ex[i].x, ex[i].y, &ybar, &hbar, sm, sparm);
+		fy = copy_svector(fycache[i]);
+		fybar = psi(ex[i].x,ybar,hbar,sm,sparm);
+		exampleScores[i].index = i;
+		lossval = loss(ex[i].y,ybar,hbar,sparm);
+    difficulty = 0;
+		for (f=fy;f;f=f->next) {
+			j = 0;
+			while (1) {
+				if(!f->words[j].wnum)
+					break;
+				difficulty -= sm->w[f->words[j].wnum]*f->words[j].weight;
+				j++;
+			}
+		}
+		for (f=fybar;f;f=f->next) {
+			j = 0;
+			while (1) {
+				if(!f->words[j].wnum)
+					break;
+				difficulty += sm->w[f->words[j].wnum]*f->words[j].weight;
+				j++;
+			}
+		}
+
+    if(uncertaintyWeight) {
+      numPositions = get_num_latent_variable_options(ex[i].x, ex[i].y, sm, sparm);
+      hvScores = malloc(numPositions * sizeof(double));
+      get_latent_variable_scores(ex[i].x, ex[i].y, hvScores, sm, sparm);
+      
+      scoreSum = 0.0;
+      for(j = 0; j < numPositions; j++) {
+        hvScores[j] = 1/(1+exp(Asigm*hvScores[j]));
+        scoreSum += hvScores[j];
+      }
+      for(j = 0; j < numPositions; j++) {
+        hvScores[j] /= scoreSum;
+      }
+
+      uncertainty = get_entropy(hvScores, numPositions);
+    } else {
+      uncertainty = 0.0;    
+    }
+    //printf("Example %d, difficulty %.4f, uncertainty %.4f, loss %.4f\n",i,difficulty,uncertainty,lossval);
+		exampleScores[i].val = lossval + difficultyWeight * difficulty + uncertaintyWeight * uncertainty;
+    //printf("Slack %d: %f\n",i,slack[i].val);
+		free_svector(fy);
+		free_svector(fybar);
+	}
+	qsort(exampleScores,m,sizeof(sortStruct),&compar);
 
 	half = (int) round(sparm->init_valid_fraction*m);
-	init_spl_weight = (double)m/C/slack[half].val;
+	init_spl_weight = (double)m/C/exampleScores[half].val;
 
-	free(slack);
+  if(uncertaintyWeight) {
+    halfPos = (int) round(sparm->init_valid_fraction*m/2); //half of positive examples
+    numPos = 0;
+    for(i=0;i<m;i++) {
+      if(ex[exampleScores[i].index].y.label == 1) numPos++;
+      if(numPos >= halfPos) { 
+        init_spl_weight = (double)m/C/exampleScores[i].val;
+        break;
+      }
+    }
+  }
+
+	free(exampleScores);
 
 	return(init_spl_weight);
 }
@@ -860,6 +1005,22 @@ double compute_current_loss(SAMPLE val, STRUCTMODEL *sm, STRUCT_LEARN_PARM *spar
 	return cur_loss;
 }
 
+double compute_average_hamming_distance(EXAMPLE *ex, long m, int *valid_examples, STRUCT_LEARN_PARM *sparm) {
+  long i,j;
+  long sum;
+  long count;
+  for(i=0;i<m;i++) {
+    if(valid_examples[i] && ex[i].y.label == 1) {
+      for(j=i+1;j<m;j++) {
+        if(valid_examples[j] && ex[j].y.label == 1) {
+          sum += compute_hamming_distance(ex[i].x,ex[i].h.position,ex[j].x,ex[j].h.position,sparm);
+          count++;
+        }
+      }
+    }
+  }  
+  return ((double) sum)/count;
+}
 
 int main(int argc, char* argv[]) {
 
@@ -874,6 +1035,7 @@ int main(int argc, char* argv[]) {
 	char examplesfile[1024];
 	char timefile[1024];
 	char latentfile[1024];
+  char hammingfile[1024];
   int MAX_ITER;
   /* new struct variables */
   SVECTOR **fycache, *diff, *fy;
@@ -897,7 +1059,7 @@ int main(int argc, char* argv[]) {
  
 
   /* read input parameters */
-	my_read_input_parameters(argc, argv, trainfile, modelfile, examplesfile, timefile, latentfile, &learn_parm, &kernel_parm, &sparm, 
+	my_read_input_parameters(argc, argv, trainfile, modelfile, examplesfile, timefile, latentfile, hammingfile, &learn_parm, &kernel_parm, &sparm, 
 													&init_spl_weight, &spl_factor); 
 
   epsilon = learn_parm.eps;
@@ -995,6 +1157,7 @@ int main(int argc, char* argv[]) {
 	FILE	*fexamples = fopen(examplesfile,"w");
 	FILE	*ftime = fopen(timefile,"w");
 	FILE	*flatent = fopen(latentfile,"w");
+  FILE  *fhamming = fopen(hammingfile,"w");
 	clock_t start = clock();
 
 	spl_weight = init_spl_weight;
@@ -1048,6 +1211,10 @@ int main(int argc, char* argv[]) {
 			latent_update++;
 		}
 
+    //double avgHD = compute_average_hamming_distance(ex,m,valid_examples,&sparm);
+    //printf("Average Hamming Distance: %f\n", avgHD);
+    //fprintf(fhamming,"%f \n",avgHD); fflush(flatent);
+  
     /* re-compute feature vector cache */
     for (i=0;i<m;i++) {
       free_svector(fycache[i]);
@@ -1104,7 +1271,7 @@ int main(int argc, char* argv[]) {
 
 
 
-void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* modelfile, char *examplesfile, char *timefile, char *latentfile,
+void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* modelfile, char *examplesfile, char *timefile, char *latentfile, char *hammingfile,
 			      LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm,
 						double *init_spl_weight, double *spl_factor) {
   
@@ -1128,6 +1295,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
 	*spl_factor = 1.3;
 	struct_parm->optimizer_type = 0; /* default: cutting plane, change to 1 for stochastic subgradient descent*/
 	struct_parm->init_valid_fraction = 0.5;
+  struct_parm->uncertainty_weight = 0.0;
 
   struct_parm->custom_argc=0;
 
@@ -1146,6 +1314,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
 		case 'm': i++; *spl_factor = atof(argv[i]); break;
 		case 'o': i++; struct_parm->optimizer_type = atoi(argv[i]); break;
 		case 'f': i++; struct_parm->init_valid_fraction = atof(argv[i]); break;
+    case 'u': i++; struct_parm->uncertainty_weight = atof(argv[i]); break;
     case '-': strcpy(struct_parm->custom_argv[struct_parm->custom_argc++],argv[i]);i++; strcpy(struct_parm->custom_argv[struct_parm->custom_argc++],argv[i]);break; 
     default: printf("\nUnrecognized option %s!\n\n",argv[i]);
       exit(0);
@@ -1178,6 +1347,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
 	sprintf(examplesfile,"%s.examples",filestub);
 	sprintf(timefile,"%s.time",filestub);
 	sprintf(latentfile,"%s.latent",filestub);
+  sprintf(hammingfile,"%s.hamming",filestub);
 
 	/* self-paced learning weight should be non-negative */
 	if(*init_spl_weight < 0.0)

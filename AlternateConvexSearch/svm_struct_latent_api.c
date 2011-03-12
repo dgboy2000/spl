@@ -17,10 +17,14 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
+#include <math.h>
 #include "svm_struct_latent_api_types.h"
 #include "./SFMT-src-1.3.3/SFMT.h"
 
 #define MAX_INPUT_LINE_LENGTH 10000
+
+#define MAX(x,y) ((x) < (y) ? (y) : (x))
+#define MIN(x,y) ((x) > (y) ? (y) : (x))
 
 SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm) {
 /*
@@ -313,6 +317,36 @@ void find_most_violated_constraint_marginrescaling(PATTERN x, LABEL y, LABEL *yb
   
 }
 
+int get_num_latent_variable_options(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+  if (y.label == -1) return 1;
+  else return x.length-sparm->motif_length-sparm->bg_markov_order;
+}
+
+int get_latent_variable_scores(PATTERN x, LABEL y, double *scores, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+// Computes the scores for each possible value of the latent variable
+// Returns -1 if y = -1
+  
+  if(y.label == -1) {
+    scores[0] = 1;
+    return;
+  }
+
+  int *pattern_hash, max_pos,j,h;
+  double score;
+
+  pattern_hash = sm->pattern_hash[x.example_id];
+  
+  for (h=0;h<x.length-sparm->motif_length-sparm->bg_markov_order;h++) {
+    score = 0.0;
+    for (j=h;j<h+sparm->motif_length;j++) {
+      score += sm->w[sm->sizePsi-(4*(j-h)+base2int(x.sequence[j]))];
+      score -= sm->w[1+pattern_hash[j]];
+    }
+    scores[h] = score;
+  }
+}
+
+
 LATENT_VAR infer_latent_variables(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
 /*
   Complete the latent variable h for labeled examples, i.e.,
@@ -349,6 +383,17 @@ LATENT_VAR infer_latent_variables(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LE
   return(h); 
 }
 
+int compute_hamming_distance(PATTERN x1, int h1p, PATTERN x2, int h2p, STRUCT_LEARN_PARM *sparm) {
+  int len = sparm->motif_length;
+  int pos;
+  int numDiff = 0;
+
+  for(pos = 0; pos < len; pos++) {
+    if(x1.sequence[h1p + pos] != x2.sequence[h2p + pos]) numDiff++;
+  }
+  
+  return(numDiff);
+}
 
 double loss(LABEL y, LABEL ybar, LATENT_VAR hbar, STRUCT_LEARN_PARM *sparm) {
 /*

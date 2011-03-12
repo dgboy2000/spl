@@ -9,14 +9,6 @@ static void MSKAPI printstr(void *handle, char str[]) {
   //printf("%s", str);
 } /* printstr */
 
-/* 
-G - Gram matrix
-delta
-alpha
-k
-C
-dual_obj
-*/
 int mosek_qp_optimize(double** G, double* delta, double* alpha, long k, double C, double *dual_obj) {
   long i,j,t;
   double *c;
