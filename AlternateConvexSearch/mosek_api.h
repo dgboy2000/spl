@@ -17,6 +17,8 @@
 double *compute_delta_w (double *w /* Vector of feature weights */,
                          double *phi_h_star /* \Phi(x, y, h_star) */ ,
                          double **phi_y_h_hat /* phi_y_h_hat[i] is the value of \phi for the i-th y_hat, h_hat pair */,
-                         int num_features);
+                         double *y_loss, /* Vector of \Delta(y, y_hat) values */
+                         int num_features, /* Size of w */
+                         int num_pairs /* Number of y_hat/h_hat pairs */);
 
 
