@@ -692,28 +692,41 @@ double *convert_from_svector(SVECTOR *svec,int size) {
 }
 
 double get_novelty(EXAMPLE *ex, long exNum, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
-  long j;
-  SVECTOR *psi_h_star_sparse = psi(ex[exNum].x, ex[exNum].y, ex[exNum].h, sm, sparm);
-  double *psi_h_star = convert_from_svector(psi_h_star_sparse,sm->sizePsi);
   int numPairs;  
-  SVECTOR **psi_h_y_hats_sparse = get_all_psi(ex, exNum, &numPairs, sm, sparm);
-  double **psi_h_y_hats = malloc(numPairs*sizeof(double *));
+  long j;
+
+	SVECTOR *psi_h_star_sparse;
+	SVECTOR **psi_h_y_hats_sparse;
+	
+	double *psi_h_star;
+	double **psi_h_y_hats;
+	double losses[numPairs];
+  
+  psi_h_star_sparse = psi(ex[exNum].x, ex[exNum].y, ex[exNum].h, sm, sparm);
+  psi_h_star = convert_from_svector(psi_h_star_sparse,sm->sizePsi);
+
+  psi_h_y_hats_sparse = get_all_psi(ex, exNum, &numPairs, sm, sparm);
+  psi_h_y_hats = malloc(numPairs*sizeof(double *));
+
   for(j=0;j<numPairs;j++) {
     psi_h_y_hats[j] = convert_from_svector(psi_h_y_hats_sparse[j],sm->sizePsi);
   }
-  double losses[numPairs];
+
   get_all_losses(ex, exNum, losses, sm, sparm);
   
-  double novelty = compute_delta_w(sm->w,psi_h_star,psi_h_y_hats,losses,sm->sizePsi,numPairs);
+  // double novelty = compute_delta_w(sm->w,psi_h_star,psi_h_y_hats,losses,sm->sizePsi,numPairs);
 
   for(j=0;j<numPairs;j++) {
     free_svector(psi_h_y_hats_sparse[j]);
+		free(psi_h_y_hats[j]);
   }  
-  free_svector(psi_h_star_sparse);  
   free(psi_h_y_hats_sparse);
-  free(psi_h_star);
   free(psi_h_y_hats);
-  return novelty;
+
+  free_svector(psi_h_star_sparse);  
+  free(psi_h_star);
+
+	return 0;//novelty;
 }
 
 double get_entropy(double *distrib, int numEntries) {
