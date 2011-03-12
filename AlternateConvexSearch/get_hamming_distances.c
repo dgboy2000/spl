@@ -8,6 +8,11 @@
 
 #include "svm_struct_latent_api.h"
 
+#define MOTIF_LEN 10
+#define CH0 'A'
+#define CH1 'C'
+#define CH2 'T'
+#define CH3 'G'
 
 int main(int argc, char* argv[]) {
 
@@ -45,21 +50,23 @@ int main(int argc, char* argv[]) {
   }
   
   STRUCT_LEARN_PARM sparm;
-  sparm.motif_length = 10;
+  sparm.motif_length = MOTIF_LEN;
 	SAMPLE alldata = read_struct_examples(dataFN,&sparm);
-
+  int charCounts[4*MOTIF_LEN];
+  
+  
   int numSamples = alldata.n;
 
   int valid_examples[numSamples];
   int hidden_pos[numSamples]; 
   int lenValid,lenHidden;
-  char lineValid[numSamples*10];
-  char lineHidden[numSamples*10];
+  char lineValid[numSamples*MOTIF_LEN];
+  char lineHidden[numSamples*MOTIF_LEN];
   char *curValid, *curHidden;
   char *resultValid, *resultHidden;
 
   int len;
-  char numStr[10];
+  char numStr[4*MOTIF_LEN];
 
   while(1) {
     resultValid = fgets(lineValid,numSamples*10,exampleFile);
@@ -84,20 +91,33 @@ int main(int argc, char* argv[]) {
         curHidden += strlen(curHidden)+1;
     }
 
-    sum = 0;
+    for(i=0;i<4*MOTIF_LEN;i++) charCounts[i]=0;
+    char ch;
     count = 0;
     for(i=0;i<numSamples;i++) {
       if(valid_examples[i] && alldata.examples[i].y.label == 1) {
-        for(j=i+1;j<numSamples;j++) {
-          if(valid_examples[j] && alldata.examples[j].y.label == 1) {
-            sum += compute_hamming_distance(alldata.examples[i].x,hidden_pos[i],alldata.examples[j].x,hidden_pos[j],&sparm);    
-            count++;
-          }
+        for(j=0;j<MOTIF_LEN;j++) {
+          ch = alldata.examples[i].x.sequence[hidden_pos[i]+j]; 
+          if(ch == CH0) charCounts[4*j]++;
+          if(ch == CH1) charCounts[4*j+1]++;
+          if(ch == CH2) charCounts[4*j+2]++;
+          if(ch == CH3) charCounts[4*j+3]++;
         }
+        count++;
       }
     }  
-  double avgHD = ((double) sum)/count;
-  printf("\n%f\n",avgHD); fflush(stdout);
-  fprintf(saveFile,"%f\n",avgHD); fflush(saveFile);
+
+    sum = 0;
+    for(j=0;j<MOTIF_LEN;j++) {
+      sum+=charCounts[4*j]*(charCounts[4*j+1]+charCounts[4*j+2]+charCounts[4*j+3]);
+      sum+=charCounts[4*j+1]*(charCounts[4*j+2]+charCounts[4*j+3]);
+      sum+=charCounts[4*j+2]*charCounts[4*j+3];  
+    }
+
+    count = count*(count-1)/2;
+
+    double avgHD = ((double) sum)/count;
+    printf("\n%f\n",avgHD); fflush(stdout);
+    fprintf(saveFile,"%f\n",avgHD); fflush(saveFile);
   }
 }
