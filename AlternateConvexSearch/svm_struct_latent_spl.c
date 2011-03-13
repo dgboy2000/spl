@@ -1319,6 +1319,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
   struct_parm->uncertainty_weight = 0.0;
   struct_parm->novelty_weight = 0.0;
   struct_parm->print_extensive = 0;
+  struct_parm->reduced_size = 0;
 
   struct_parm->custom_argc=0;
 
@@ -1340,6 +1341,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
     case 'u': i++; struct_parm->uncertainty_weight = atof(argv[i]); break;
     case 'v': i++; struct_parm->novelty_weight = atof(argv[i]); break;
     case 'x': i++; struct_parm->print_extensive = atoi(argv[i]); break;
+    case 'z': i++; struct_parm->reduced_size = atoi(argv[i]); break;
     case '-': strcpy(struct_parm->custom_argv[struct_parm->custom_argc++],argv[i]);i++; strcpy(struct_parm->custom_argv[struct_parm->custom_argc++],argv[i]);break; 
     default: printf("\nUnrecognized option %s!\n\n",argv[i]);
       exit(0);

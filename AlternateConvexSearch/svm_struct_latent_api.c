@@ -34,7 +34,8 @@ SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm) {
   initialized in this function or by calling init_latent_variables(). 
 */
   SAMPLE sample;
-  int num_examples,i,label,length_seq,example_type;
+  int tot_num_examples,num_examples,i,j,pos_count,neg_count,label,length_seq,example_type;
+  int num_to_use;
   FILE *fp;
   char line[MAX_INPUT_LINE_LENGTH]; 
   char *pchar, *last_pchar;
@@ -45,16 +46,27 @@ SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm) {
 	exit(1);
   }
   fgets(line, MAX_INPUT_LINE_LENGTH, fp);
-  num_examples = atoi(line);
+  tot_num_examples = atoi(line);
+  if(sparm->reduced_size && 2*sparm->reduced_size < tot_num_examples) {
+    num_examples = 2*sparm->reduced_size;
+  } else {
+    num_examples = tot_num_examples;
+  }
+
   sample.n = num_examples;
   sample.examples = (EXAMPLE*)malloc(sizeof(EXAMPLE)*num_examples);
   
-  for (i=0;(!feof(fp))&&(i<num_examples);i++) {
+  char seq_name[100];
+  j=0;
+  pos_count=0; 
+  neg_count=0;
+  for (i=0;(!feof(fp))&&(i<tot_num_examples);i++) {
     fgets(line, MAX_INPUT_LINE_LENGTH, fp);
+
     pchar = line;
     while ((*pchar)!=':') pchar++;
     *pchar = '\0';
-    strcpy(sample.examples[i].x.seq_name, line);
+    strcpy(seq_name,line);
     pchar++;
 
     /* label: {+1, -1} */
@@ -76,20 +88,25 @@ SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm) {
       pchar[length_seq-1]='\0';
       length_seq--;
     }
-
-    sample.examples[i].y.label = label;
-    sample.examples[i].x.length = length_seq;
-    sample.examples[i].x.sequence = (char*)malloc(sizeof(char)*(length_seq+1));
-    strcpy(sample.examples[i].x.sequence, pchar);
-    sample.examples[i].x.example_id = i;
-    sample.examples[i].x.example_type = example_type;
-    if (example_type==0) {
-      sample.examples[i].x.example_cost = 1.0;
-    } else {
-      sample.examples[i].x.example_cost = sparm->false_negative_cost;
-    }
+    if((label == 1 && pos_count < num_examples/2) || (label == -1 && neg_count < num_examples/2)) {
+      strcpy(sample.examples[j].x.seq_name, seq_name);
+      sample.examples[j].y.label = label;
+      sample.examples[j].x.length = length_seq;
+      sample.examples[j].x.sequence = (char*)malloc(sizeof(char)*(length_seq+1));
+      strcpy(sample.examples[j].x.sequence, pchar);
+      sample.examples[j].x.example_id = j;
+      sample.examples[j].x.example_type = example_type;
+      if (example_type==0) {
+        sample.examples[j].x.example_cost = 1.0;
+      } else {
+        sample.examples[j].x.example_cost = sparm->false_negative_cost;
+      }
+      j++;
+      if(label == -1) neg_count++;
+      if(label == 1) pos_count++;
+    } 
   }
-  assert(i==num_examples);
+  assert(j==num_examples);
   fclose(fp);  
 
   return(sample); 
@@ -347,9 +364,8 @@ int get_num_latent_variable_options(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_
   else return x.length-sparm->motif_length-sparm->bg_markov_order;
 }
 
-int get_latent_variable_scores(PATTERN x, LABEL y, double *scores, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+void get_latent_variable_scores(PATTERN x, LABEL y, double *scores, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
 // Computes the scores for each possible value of the latent variable
-// Returns -1 if y = -1
   
   if(y.label == -1) {
     scores[0] = 1;

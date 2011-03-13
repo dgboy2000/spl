@@ -99,5 +99,6 @@ typedef struct struct_learn_parm {
   double uncertainty_weight;
   double novelty_weight;
   int print_extensive;
+  int reduced_size;
 } STRUCT_LEARN_PARM;
 
