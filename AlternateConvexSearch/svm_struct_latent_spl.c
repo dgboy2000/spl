@@ -789,7 +789,7 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
 			}
 		}
     
-    if(uncertaintyWeight || sparm->print_intensive) {
+    if(uncertaintyWeight || sparm->print_extensive) {
       numPositions = get_num_latent_variable_options(ex[i].x, ex[i].y, sm, sparm);
       hvScores = malloc(numPositions * sizeof(double));
       get_latent_variable_scores(ex[i].x, ex[i].y, hvScores, sm, sparm);
@@ -809,7 +809,7 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
       uncertainty = 0.0;    
     }
 
-    if(noveltyWeight || sparm->print_intensive) {
+    if(noveltyWeight || sparm->print_extensive) {
       novelty = 0.0; //CHANGE THIS WHEN THE NOVELTY CODE IS READY!!!!!
       //novelty = get_novelty(ex,i,sm,sparm);
     } else {
@@ -1339,7 +1339,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
 		case 'f': i++; struct_parm->init_valid_fraction = atof(argv[i]); break;
     case 'u': i++; struct_parm->uncertainty_weight = atof(argv[i]); break;
     case 'v': i++; struct_parm->novelty_weight = atof(argv[i]); break;
-    case 'x': i++; struct_parm->print_intensive = 1; break;
+    case 'x': i++; struct_parm->print_extensive = atoi(argv[i]); break;
     case '-': strcpy(struct_parm->custom_argv[struct_parm->custom_argc++],argv[i]);i++; strcpy(struct_parm->custom_argv[struct_parm->custom_argc++],argv[i]);break; 
     default: printf("\nUnrecognized option %s!\n\n",argv[i]);
       exit(0);
