@@ -715,8 +715,9 @@ double get_novelty(EXAMPLE *ex, long exNum, STRUCTMODEL *sm, STRUCT_LEARN_PARM *
 	double losses[numPairs];
   get_all_losses(ex, exNum, losses, sm, sparm);
   
-  // double novelty = compute_delta_w(sm->w,psi_h_star,psi_h_y_hats,losses,sm->sizePsi,numPairs);
-
+  double novelty = compute_delta_w(sm->w,psi_h_star,psi_h_y_hats,losses,sm->sizePsi,numPairs);
+  //double novelty = 0.0;
+  
   for(j=0;j<numPairs;j++) {
 		printf ("Freeing vector %d\n", j);
     free_svector(psi_h_y_hats_sparse[j]);
@@ -728,7 +729,7 @@ double get_novelty(EXAMPLE *ex, long exNum, STRUCTMODEL *sm, STRUCT_LEARN_PARM *
   free_svector(psi_h_star_sparse);  
   free(psi_h_star);
 
-	return 0;//novelty;
+	return novelty;
 }
 
 double get_entropy(double *distrib, int numEntries) {
@@ -805,6 +806,7 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
       }
 
       uncertainty = get_entropy(hvScores, numPositions);
+      free(hvScores);
     } else {
       uncertainty = 0.0;    
     }
