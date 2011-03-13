@@ -44,7 +44,7 @@
 
 int mosek_qp_optimize(double**, double*, double*, long, double, double*);
 
-void my_read_input_parameters(int argc, char* argv[], char *trainfile, char *modelfile, char *examplesfile, char *timefile, char *latentfile, char *hammingfile,
+void my_read_input_parameters(int argc, char* argv[], char *trainfile, char *modelfile, char *examplesfile, char *timefile, char *latentfile, char *slackfile, char *uncertaintyfile, char *noveltyfile,
 			      LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm, 
 						double *init_spl_weight, double *spl_factor);
 
@@ -746,7 +746,8 @@ double get_entropy(double *distrib, int numEntries) {
 }
 
 sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex, 
-													STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+													STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, 
+                          double *slacks, double *entropies, double *novelties) {
 	long i, j;
   int numPositions;
 	double difficulty, lossval, uncertainty, novelty, *hvScores, scoreSum;
@@ -760,7 +761,6 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
 	LABEL ybar;
 	LATENT_VAR hbar;
 	SVECTOR *f, *fy, *fybar;
-
 
 	for (i=0;i<m;i++) {		
 		find_most_violated_constraint_marginrescaling(ex[i].x, ex[i].y, &ybar, &hbar, sm, sparm);
@@ -789,7 +789,7 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
 			}
 		}
     
-    if(uncertaintyWeight) {
+    if(uncertaintyWeight || sparm->print_intensive) {
       numPositions = get_num_latent_variable_options(ex[i].x, ex[i].y, sm, sparm);
       hvScores = malloc(numPositions * sizeof(double));
       get_latent_variable_scores(ex[i].x, ex[i].y, hvScores, sm, sparm);
@@ -809,13 +809,19 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
       uncertainty = 0.0;    
     }
 
-    if(noveltyWeight) {
-      novelty = get_novelty(ex,i,sm,sparm);
+    if(noveltyWeight || sparm->print_intensive) {
+      novelty = 0.0; //CHANGE THIS WHEN THE NOVELTY CODE IS READY!!!!!
+      //novelty = get_novelty(ex,i,sm,sparm);
     } else {
       novelty = 0.0;    
     }
     //printf("Example %d, difficulty %.4f, uncertainty %.4f, loss %.4f\n",i,difficulty,uncertainty,lossval);
 		exampleScores[i].val = lossval + difficultyWeight * difficulty + uncertaintyWeight * uncertainty + noveltyWeight * novelty; //score!!
+    
+    if(slacks) slacks[i] = difficulty;
+    if(entropies) entropies[i] = uncertainty;
+    if(novelties) novelties[i] = novelty; 
+
 		free_svector(fy);
 		free_svector(fybar);
 	}
@@ -825,7 +831,8 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
 }
 
 int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPLE *ex, 
-													STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight) {
+													STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight, 
+                          double *slacks, double *entropies, double *novelties) {
 
   long i;
 	/* if self-paced learning weight is non-positive, all examples are valid */
@@ -835,7 +842,7 @@ int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPL
 		return (m);
 	}
 
-	sortStruct *exampleScores = get_example_scores(m, C, fycache, ex, sm, sparm);
+	sortStruct *exampleScores = get_example_scores(m, C, fycache, ex, sm, sparm, slacks, entropies, novelties);
 
   double penalty = 1.0/spl_weight;
 	if(penalty < 0.0)
@@ -861,7 +868,7 @@ int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPL
 double get_init_spl_weight(long m, double C, SVECTOR **fycache, EXAMPLE *ex, 
 													 STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
 
-	sortStruct *exampleScores = get_example_scores(m, C, fycache, ex, sm, sparm);
+	sortStruct *exampleScores = get_example_scores(m, C, fycache, ex, sm, sparm, NULL, NULL, NULL);
   
   long i;
   int half, halfPos, numPos;
@@ -888,7 +895,8 @@ double get_init_spl_weight(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
 }
 
 double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double epsilon, SVECTOR **fycache, EXAMPLE *ex, 
-                               STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight) {
+                               STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight, 
+                               double *slacks, double *entropies, double *novelties) {
 
 	long i;
 	int iter = 0, converged, nValid;
@@ -899,7 +907,7 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
 
 	for (i=0;i<sm->sizePsi+1;i++)
 		best_w[i] = w[i];
-	nValid = update_valid_examples(w, m, C, fycache, ex, sm, sparm, valid_examples, spl_weight);
+	nValid = update_valid_examples(w, m, C, fycache, ex, sm, sparm, valid_examples, spl_weight, slacks, entropies, novelties);
 	last_relaxed_primal_obj = current_obj_val(ex, fycache, m, sm, sparm, C, valid_examples);
 	if(nValid < m)
 		last_relaxed_primal_obj += (double)(m-nValid)/((double)spl_weight);
@@ -909,7 +917,7 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
 	}
 
 	for (iter=0;;iter++) {
-		nValid = update_valid_examples(w, m, C, fycache, ex, sm, sparm, valid_examples, spl_weight);
+		nValid = update_valid_examples(w, m, C, fycache, ex, sm, sparm, valid_examples, spl_weight, slacks, entropies, novelties);
 		printf("ACS Iteration %d: number of examples = %d\n",iter,nValid); fflush(stdout);
 		converged = check_acs_convergence(prev_valid_examples,valid_examples,m);
 		if(converged) {
@@ -1018,22 +1026,6 @@ double compute_current_loss(SAMPLE val, STRUCTMODEL *sm, STRUCT_LEARN_PARM *spar
 	return cur_loss;
 }
 
-double compute_average_hamming_distance(EXAMPLE *ex, long m, int *valid_examples, STRUCT_LEARN_PARM *sparm) {
-  long i,j;
-  long sum;
-  long count;
-  for(i=0;i<m;i++) {
-    if(valid_examples[i] && ex[i].y.label == 1) {
-      for(j=i+1;j<m;j++) {
-        if(valid_examples[j] && ex[j].y.label == 1) {
-          sum += compute_hamming_distance(ex[i].x,ex[i].h.position,ex[j].x,ex[j].h.position,sparm);
-          count++;
-        }
-      }
-    }
-  }  
-  return ((double) sum)/count;
-}
 
 int main(int argc, char* argv[]) {
 
@@ -1048,7 +1040,9 @@ int main(int argc, char* argv[]) {
 	char examplesfile[1024];
 	char timefile[1024];
 	char latentfile[1024];
-  char hammingfile[1024];
+  char slackfile[1024];
+  char uncertaintyfile[1024];
+  char noveltyfile[1024];
   int MAX_ITER;
   /* new struct variables */
   SVECTOR **fycache, *diff, *fy;
@@ -1069,11 +1063,12 @@ int main(int argc, char* argv[]) {
 	double spl_weight;
 	double spl_factor;
 	int *valid_examples;
- 
+     
+  double *slacks, *entropies, *novelties;
 
   /* read input parameters */
-	my_read_input_parameters(argc, argv, trainfile, modelfile, examplesfile, timefile, latentfile, hammingfile, &learn_parm, &kernel_parm, &sparm, 
-													&init_spl_weight, &spl_factor); 
+	my_read_input_parameters(argc, argv, trainfile, modelfile, examplesfile, timefile, latentfile, slackfile, uncertaintyfile, noveltyfile, 
+                      &learn_parm, &kernel_parm, &sparm, &init_spl_weight, &spl_factor); 
 
   epsilon = learn_parm.eps;
   C = learn_parm.svm_c;
@@ -1111,6 +1106,9 @@ int main(int argc, char* argv[]) {
   printf("sample.n: %d\n", sample.n); 
   printf("sm.sizePsi: %ld\n", sm.sizePsi); fflush(stdout);
   
+  slacks = calloc(m,sizeof(double));
+  entropies = calloc(m,sizeof(double));
+  novelties = calloc(m,sizeof(double));
 
   /* impute latent variable for first iteration */
   init_latent_variables(&sample,&learn_parm,&sm,&sparm);
@@ -1170,7 +1168,9 @@ int main(int argc, char* argv[]) {
 	FILE	*fexamples = fopen(examplesfile,"w");
 	FILE	*ftime = fopen(timefile,"w");
 	FILE	*flatent = fopen(latentfile,"w");
-  FILE  *fhamming = fopen(hammingfile,"w");
+  FILE *fslack = fopen(slackfile,"w");
+  FILE *fentropy = fopen(uncertaintyfile,"w");
+  FILE *fnovelty = fopen(noveltyfile,"w");
 	clock_t start = clock();
 
 	spl_weight = init_spl_weight;
@@ -1183,17 +1183,23 @@ int main(int argc, char* argv[]) {
     /* cutting plane algorithm */
     //primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples);
 		/* solve biconvex self-paced learning problem */
-		primal_obj = alternate_convex_search(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples, spl_weight);
+		primal_obj = alternate_convex_search(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples, spl_weight, slacks, entropies, novelties);
 		int nValid = 0;
 		for (i=0;i<m;i++) {
 			fprintf(fexamples,"%d ",valid_examples[i]);
 			print_latent_var(ex[i].h,flatent);
+      fprintf(fslack,"%f ",slacks[i]);
+      fprintf(fentropy,"%f ",entropies[i]);
+      fprintf(fnovelty,"%f ",novelties[i]);
 			if(valid_examples[i]) {
 				nValid++;
 			}
 		}
 		fprintf(fexamples,"\n"); fflush(fexamples);
 		fprintf(flatent,"\n"); fflush(flatent);
+    fprintf(fslack,"\n"); fflush(fslack);
+    fprintf(fentropy,"\n"); fflush(fentropy);
+    fprintf(fnovelty,"\n"); fflush(fnovelty);
 		clock_t finish = clock();
 		fprintf(ftime,"%f %f\n",primal_obj,(((double)(finish-start))/CLOCKS_PER_SEC)); fflush(ftime);
     
@@ -1253,6 +1259,12 @@ int main(int argc, char* argv[]) {
 	fclose(fexamples);
 	fclose(ftime);
 	fclose(flatent);
+  fclose(fslack);
+  fclose(fentropy);
+  fclose(fnovelty);
+  free(slacks);
+  free(entropies);
+  free(novelties);
   
 
   /* write structural model */
@@ -1280,7 +1292,7 @@ int main(int argc, char* argv[]) {
 
 
 
-void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* modelfile, char *examplesfile, char *timefile, char *latentfile, char *hammingfile,
+void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* modelfile, char *examplesfile, char *timefile, char *latentfile, char *slackfile, char *uncertaintyfile, char *noveltyfile,
 			      LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm,
 						double *init_spl_weight, double *spl_factor) {
   
@@ -1306,6 +1318,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
 	struct_parm->init_valid_fraction = 0.5;
   struct_parm->uncertainty_weight = 0.0;
   struct_parm->novelty_weight = 0.0;
+  struct_parm->print_extensive = 0;
 
   struct_parm->custom_argc=0;
 
@@ -1326,6 +1339,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
 		case 'f': i++; struct_parm->init_valid_fraction = atof(argv[i]); break;
     case 'u': i++; struct_parm->uncertainty_weight = atof(argv[i]); break;
     case 'v': i++; struct_parm->novelty_weight = atof(argv[i]); break;
+    case 'x': i++; struct_parm->print_intensive = 1; break;
     case '-': strcpy(struct_parm->custom_argv[struct_parm->custom_argc++],argv[i]);i++; strcpy(struct_parm->custom_argv[struct_parm->custom_argc++],argv[i]);break; 
     default: printf("\nUnrecognized option %s!\n\n",argv[i]);
       exit(0);
@@ -1358,7 +1372,9 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
 	sprintf(examplesfile,"%s.examples",filestub);
 	sprintf(timefile,"%s.time",filestub);
 	sprintf(latentfile,"%s.latent",filestub);
-  sprintf(hammingfile,"%s.hamming",filestub);
+  sprintf(slackfile,"%s.slack",filestub);
+  sprintf(uncertaintyfile,"%s.entropy",filestub);
+  sprintf(noveltyfile,"%s.novelty",filestub);
 
 	/* self-paced learning weight should be non-negative */
 	if(*init_spl_weight < 0.0)
