@@ -1,6 +1,10 @@
 function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlot, showIters, getOrder)
 %UNTITLED Summary of this function goes here
 %   Detailed explanation goes here
+% prot      - string of which protein
+% typeRange - vector of which algorithms to look at
+% fold, seed- tell which file to read in
+% bools: showPlot, showIters, getOrder
 
     %prots = {'052','074','108','131','146'};
     types = {'','_spl','_newHalf','_newAll'};
@@ -12,12 +16,14 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
     %fold = 1;
     %seed = '0000';
 
-    latent = cell(1,numel(typeRange));
-    example = cell(1,numel(typeRange));
-    hamming = cell(1,numel(typeRange));
-    slack = cell(1,numel(typeRange));
-    entropy = cell(1,numel(typeRange));
-    novelty = cell(1,numel(typeRange));
+    % one cell per alg
+    % rows are iterations, columns are examples
+    latent = cell(1,numel(typeRange)); % latent variable at each iteration for each point
+    example = cell(1,numel(typeRange)); % boolean for was chosen?
+    hamming = cell(1,numel(typeRange)); % vec of average hamming dist over selected
+    slack = cell(1,numel(typeRange)); % all slacks
+    entropy = cell(1,numel(typeRange)); % entropy
+    novelty = cell(1,numel(typeRange)); %
     obj = cell(1,numel(typeRange));
     numIters = zeros(1,numel(typeRange));
     numEx = 0;
@@ -99,9 +105,109 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
     end
     
     if getOrder,
+        order = cell(1,numel(typeRange)); % One cell per order vector of entries added for the corresponding algorithm
         for t = 1:numel(typeRange),
+            ex = examples{t};
+            ord = zeros(1, size(examples))
             
+            % {'CCCP','SPL','Uncertainty-Slack','Uncertainty'}
+            switch typeNames{t};
+              case 'CCCP'
+                criteria = zeros(size(latent{t}));
+              case 'SPL'
+                criteria = slack{t};
+              case 'Uncertainty-Slack'
+                criteria = (slack{t} + entropy{t}) / 2;
+              case 'Uncertainty'
+                criteria = entropy{t};
+              otherwise
+                display('Bad typename '+typeNames{t});
+                a = 1 / 0;
+            end
+            
+            num_iters = size(ex, 1);
+            num_samples = size(ex, 2);
+            
+            % Take only the first half of the samples with correct label 1
+            % This is necessary for the entropy, and therefore also
+            % for comparing other things to the entropy
+            criteria = criteria[:, 1:(num_samples/2)];
+            ex = ex[:, 1:(num_samples/2)];
+            
+            order{t} = ComputeOrder(ex, criteria);
         end
     end
 end
+
+
+function order = ComputeOrder(examples, criteria)
+% Compute the order in which each sample was first added
+%  examples - num_iters x num_samples, boolean of whether sample was included in each iteration
+%  critera - selection criteria (smaller = more likely to select) for ordering within interations
+  
+    num_iters = size(examples, 1);
+    num_samples = size(examples, 2);
+    
+    order = 1:num_samples;
+    pts_added = 0;
+
+    % Find when each point is first included
+    first_rounds = zeros(1, num_samples);
+    for j = 1:num_samples,
+        first_rounds[j] = find(examples[:,j], 1);
+    end
+    
+    for i = 1:num_iters,
+        % Find the points first included in this iteration
+        round_samples = find(first_rounds == i);
+        if (length(round_samples) == 0),
+            continue
+        end
+        
+        % Find the permutation of round_samples that orders them by criteria (ascending)
+        round_criteria = criteria[i, round_samples];
+        [tmp,round_order] = sort(round_criteria);
+        
+        for j = round_order,
+            pts_added = pts_added + 1;
+            order[pts_added] = round_samples[j];
+        end
+    end
+    
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
