@@ -14,6 +14,7 @@
 /*                                                                      */
 /************************************************************************/
 
+#include "svm_light/svm_common.h"
 
 double compute_delta_w (double *w /* Vector of feature weights */,
                         double *phi_h_star /* \Phi(x, y, h_star) */ ,
@@ -35,3 +36,5 @@ double *vector_sum (double *a, double *b, int n);
 
 /* Computes vector difference a-b, a vector of size n */
 double dot_product (double *a, double *b, int n);
+
+int num_nonzero_ss (SVECTOR *a); /* Number of non-zero entries */
