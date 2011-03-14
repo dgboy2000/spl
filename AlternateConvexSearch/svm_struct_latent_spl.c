@@ -674,19 +674,23 @@ int check_acs_convergence(int *prev_valid_examples, int *valid_examples, long m)
 	return nValid;
 }*/
 
+/* Convert a single one-indexed sparse vector into a full vector of doubles. */
 double *convert_from_svector(SVECTOR *svec,int size) {
-  double *v = malloc(sizeof(double)*size);
+  double *v = calloc (1, sizeof(double)*size);
   SVECTOR *f;
-  long j;  
-  for (f=svec;f;f=f->next) {
-		j = 0;
-		while (1) {
-			if(!f->words[j].wnum)
-				break;
-      v[f->words[j].wnum] = f->words[j].weight;
-      j++;
+  long j;
+	int pos;
+	
+	f = svec;
+	j = 0;
+	pos = f->words[j].wnum;
+	while (pos)
+		{
+			assert (pos <= size);
+			v[pos-1] = f->words[j].weight;
+			++j;
+			pos = f->words[j].wnum;			
 		}
-	}
 
   return v;
 }
@@ -711,11 +715,11 @@ double get_novelty(EXAMPLE *ex, long exNum, STRUCTMODEL *sm, STRUCT_LEARN_PARM *
     psi_h_y_hats[j] = convert_from_svector(psi_h_y_hats_sparse[j],sm->sizePsi);
   }
 
-  double losses[numPairs];
+	double losses[numPairs];
   get_all_losses(ex, exNum, losses, sm, sparm);
   
   double novelty = compute_delta_w(sm->w,psi_h_star,psi_h_y_hats,losses,sm->sizePsi,numPairs);
-  //double novelty = 0.0;
+  // double novelty = 0.0;
   
   for(j=0;j<numPairs;j++) {
     free_svector(psi_h_y_hats_sparse[j]);
@@ -825,6 +829,8 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
 		free_svector(fy);
 		free_svector(fybar);
 	}
+
+  print_mosek_stats ();
 
 	qsort(exampleScores,m,sizeof(sortStruct),&compar);
   return(exampleScores);

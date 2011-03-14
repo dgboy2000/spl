@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include <assert.h>
 #include <string.h>
 #include <math.h>
@@ -13,7 +14,6 @@
 #define MIN(x,y) ((x) > (y) ? (y) : (x))
 
 
-#define NUMANZ 3   /* Number of non-zeros in A.           */
 #define NUMQNZ 4   /* Number of non-zeros in Q.           */
 
 static void MSKAPI printstr(void *handle,
@@ -24,6 +24,94 @@ static void MSKAPI printstr(void *handle,
 
 /* Compute the L2 norm of the vector */
 static double vector_norm (double *a, int n);
+
+/* Count the results of the mosek runs. */
+int num_good = 0;
+int num_bad = 0;
+bool debug = false;
+
+
+/* Mosek tests */
+static void test_mosek1();
+static void debug_on() {debug = true;}
+static void debug_off() {debug = false;}
+
+/* Print statistics on the mosek runs. */
+void
+print_mosek_stats ()
+{
+  printf ("%d good Mosek runs\n", num_good);
+  printf ("%d bad Mosek runs\n", num_bad);
+}
+
+
+/* Run some tests */
+void
+test_mosek ()
+{
+  debug_on ();
+  test_mosek1 ();
+  printf ("Passed mosek test 1");
+}
+
+
+/* Test mosek on a simple problem. */
+static void
+test_mosek1()
+{
+  int n = 16;
+  double **A = malloc (sizeof (double *) * n);
+  double *zeros = calloc (n, sizeof (double));
+  double *ones = malloc (sizeof (double)  * n);
+  int i,j;
+  
+  for (i=0; i<n; ++i)
+    {
+      A[i] = malloc (sizeof (double *) * n);
+      for (j=0; j<n; ++j)
+        {
+          A[i][j] = i==j?-1:0; /* A is the negative identity matrix. */
+        }
+      
+      ones[i] = 1;
+    }
+    
+  double delta_w = compute_delta_w (zeros /* Vector of feature weights */,
+                                    zeros /* \Phi(x, y, h_star) */ ,
+                                    A /* phi_y_h_hat[i] is the value of \phi for the i-th y_hat, h_hat pair */,
+                                    ones, /* Vector of \Delta(y, y_hat) values */
+                                    n, /* Size of w */
+                                    n /* Number of y_hat/h_hat pairs */);
+  
+  printf ("Found delta_w = %f, expected 4\n", delta_w);
+  assert (abs (delta_w - 4) < 0.0001);
+  
+  for (i=0; i<n; ++i)
+    {
+      free (A[i]);
+    }
+  free (A);
+}
+
+static void
+print_double_vec (double *vec, int size)
+{
+  int i;
+  for (i=0; i<size; ++i)
+    {
+      printf ("%d: %f\n", i, vec[i]);
+    }
+}
+
+static void
+print_int_vec (int *vec, int size)
+{
+  int i;
+  for (i=0; i<size; ++i)
+    {
+      printf ("%d: %d\n", i, vec[i]);
+    }
+}
 
 static void
 compute_qp_params (double *phi_h_star, /* \Phi(x, y, h_star) */
@@ -38,6 +126,7 @@ compute_qp_params (double *phi_h_star, /* \Phi(x, y, h_star) */
                    MSKintt **aptre_save,
                    MSKidxt **asub_save,
                    double **aval_save,
+                   int *anumnz_save,
                    
                    double **blc_save);
 
@@ -47,9 +136,7 @@ double compute_delta_w (double *w /* Vector of feature weights */,
                         double *y_loss, /* Vector of \Delta(y, y_hat) values */
                         int num_features, /* Size of w */
                         int num_pairs /* Number of y_hat/h_hat pairs */)
-{
-  
-  
+{ 
   
   double        c[]   = {0.0,-1.0,0.0};
 
@@ -57,14 +144,15 @@ double compute_delta_w (double *w /* Vector of feature weights */,
 	double        *buc = malloc (sizeof (double) * num_pairs);
   double        *blc;
                          
-  // MSKboundkeye  *bkx = malloc (sizeof (MSKboundkeye) * num_pairs);
-  // double        *bux = malloc (sizeof (double) * num_pairs);
-  // double        *blx;
+  MSKboundkeye  bkx[num_pairs];
+  double        bux[num_pairs];
+  double        blx[num_pairs];
   
   MSKintt       *aptrb;
   MSKintt       *aptre;
   MSKidxt       *asub;
   double        *aval;
+	int						anumnz;
                        
   MSKidxt       *qsubi = malloc (sizeof (MSKidxt) * num_features);
   MSKidxt       *qsubj = malloc (sizeof (MSKidxt) * num_features);
@@ -77,6 +165,10 @@ double compute_delta_w (double *w /* Vector of feature weights */,
     {
       bkc[i] = MSK_BK_LO;
       buc[i] = +MSK_INFINITY;
+      
+      bkx[i] = MSK_BK_LO;
+      blx[i] = -MSK_INFINITY;
+      bux[i] = +MSK_INFINITY;
     }
 
   for (i=0; i<num_features; ++i)
@@ -103,21 +195,40 @@ double compute_delta_w (double *w /* Vector of feature weights */,
                      &aptre,
                      &asub,
                      &aval,
+                     &anumnz,
 
                      &blc);
+
+   if (debug)
+     {
+       printf ("Printing sparse A:\n\n");
+        
+       printf ("aptrb\n"); print_int_vec (aptrb, num_features);
+       printf ("aptre\n"); print_int_vec (aptre, num_features);
+       printf ("asub\n"); print_int_vec (asub, anumnz);
+       printf ("aval\n"); print_double_vec (aval, anumnz);
+       
+       printf ("Upper constraints buc:\n"); print_double_vec(buc, num_features);
+       printf ("Lower constraints blc:\n"); print_double_vec(blc, num_features);
+
+       printf ("Upper x bux:\n"); print_double_vec(bux, num_features);
+       printf ("Lower x blx:\n"); print_double_vec(blx, num_features);
+     }
   
   /* Create the mosek environment. */
   r = MSK_makeenv(&env,NULL,NULL,NULL,NULL);
+  
+  // MSK_infeas_report_auto ()
 
   /* Check whether the return code is ok. */
-  if ( r==MSK_RES_OK )
-  {
-    /* Directs the log stream to the 'printstr' function. */
-    MSK_linkfunctoenvstream(env,
-                            MSK_STREAM_LOG,
-                            NULL,
-                            printstr);
-  }
+  // if ( r==MSK_RES_OK )
+  // {
+  //   /* Directs the log stream to the 'printstr' function. */
+  //   MSK_linkfunctoenvstream(env,
+  //                           MSK_STREAM_LOG,
+  //                           NULL,
+  //                           printstr);
+  // }
 
   /* Initialize the environment. */   
   r = MSK_initenv(env);
@@ -140,8 +251,8 @@ double compute_delta_w (double *w /* Vector of feature weights */,
       if (r == MSK_RES_OK)
         r = MSK_putmaxnumcon(task,num_pairs);
       
-      // if (r == MSK_RES_OK)
-      //   r = MSK_putmaxnumanz(task,NUMANZ);
+      if (r == MSK_RES_OK)
+        r = MSK_putmaxnumanz(task,anumnz);
   
       /* Append 'num_pairs' empty constraints.
        The constraints will initially have no bounds. */
@@ -164,13 +275,13 @@ double compute_delta_w (double *w /* Vector of feature weights */,
   
         /* Set the bounds on variable j.
          blx[j] <= x_j <= bux[j] */
-        // if(r == MSK_RES_OK)
-        //   r = MSK_putbound(task,
-        //                    MSK_ACC_VAR, /* Put bounds on variables.*/
-        //                    j,           /* Index of variable.*/
-        //                    bkx[j],      /* Bound key.*/
-        //                    blx[j],      /* Numerical value of lower bound.*/
-        //                    bux[j]);     /* Numerical value of upper bound.*/
+        if(r == MSK_RES_OK)
+          r = MSK_putbound(task,
+                           MSK_ACC_VAR, /* Put bounds on variables.*/
+                           j,           /* Index of variable.*/
+                           bkx[j],      /* Bound key.*/
+                           blx[j],      /* Numerical value of lower bound.*/
+                           bux[j]);     /* Numerical value of upper bound.*/
   
         /* Input column j of A */   
         if(r == MSK_RES_OK)
@@ -210,6 +321,11 @@ double compute_delta_w (double *w /* Vector of feature weights */,
         r = MSK_putqobj(task,num_features,qsubi,qsubj,qval);
       }
 
+      if ( r == MSK_RES_OK )
+      {
+        r = MSK_putintparam(task,MSK_IPAR_INFEAS_REPORT_AUTO,MSK_ON);
+      }
+
       if ( r==MSK_RES_OK )
       {
         MSKrescodee trmcode;
@@ -242,15 +358,17 @@ double compute_delta_w (double *w /* Vector of feature weights */,
                                    num_features,         /* Index of last variable+1.   */
                                    xx);
               
+              ++num_good;
               printf("Optimal primal solution\n");
-              for(j=0; j<num_features; ++j)
-                printf("x[%d]: %e\n",j,xx[j]);
+              // for(j=0; j<num_features; ++j)
+              //   printf("x[%d]: %e\n",j,xx[j]);
               
               break;
             case MSK_SOL_STA_DUAL_INFEAS_CER:
             case MSK_SOL_STA_PRIM_INFEAS_CER:
             case MSK_SOL_STA_NEAR_DUAL_INFEAS_CER:
             case MSK_SOL_STA_NEAR_PRIM_INFEAS_CER:  
+              ++num_bad;
               printf("Primal or dual infeasibility certificate found.\n");
               break;
               
@@ -355,6 +473,7 @@ compute_qp_params (double *phi_h_star, /* \Phi(x, y, h_star) */
                    MSKintt **aptre_save,
                    MSKidxt **asub_save,
                    double **aval_save,
+                   int *anumnz_save,
                    
                    double **blc_save)
 {
@@ -382,32 +501,37 @@ compute_qp_params (double *phi_h_star, /* \Phi(x, y, h_star) */
   int nz_ind = 0;
   double *tmp_vector;
   
-  /* Compute sparse constraint matrix. The i-th row is the i-th pair's feature vector diff. */
-  for (i=0; i<num_pairs; ++i)
+  /* Compute sparse constraint matrix. The (i,j)-th entry is the j-th component
+    of the i-th pair's feature vector diff. */
+  for (j=0; j<num_features; ++j)
     {
-      aptrb[i] = nz_ind;
+      aptrb[j] = nz_ind;
       
-      tmp_vector = vector_diff (phi_y_h_hat[i], phi_h_star, num_features);
-      blc[i] = y_loss[i] + dot_product (tmp_vector, w, num_features);
-      free (tmp_vector);
-      
-      for (j=0; j<num_features; ++j)
+      for (i=0; i<num_pairs; ++i)
         {
           
           if (phi_h_star[j] != phi_y_h_hat[i][j])
             {
-              asub[nz_ind] = j;
+              asub[nz_ind] = i;
               aval[nz_ind] = phi_h_star[j] - phi_y_h_hat[i][j];
               ++nz_ind;
             }
         }
-      aptre[i] = nz_ind;
+      aptre[j] = nz_ind;
+    }
+    
+  for (i=0; i<num_pairs; ++i)
+    {
+      tmp_vector = vector_diff (phi_y_h_hat[i], phi_h_star, num_features);
+      blc[i] = y_loss[i] + dot_product (tmp_vector, w, num_features);
+      free (tmp_vector);
     }
     
   *aptrb_save = aptrb;
   *aptre_save = aptre;
   *asub_save = asub;
   *aval_save = aval;
+  *anumnz_save = num_nonzero;
   
   *blc_save = blc;
 }
