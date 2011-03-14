@@ -9,7 +9,7 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
     %prots = {'052','074','108','131','146'};
     types = {'','_spl','_newHalf','_newAll','_novelty'};
     typeNames = {'CCCP','SPL','Uncertainty-Slack','Uncertainty'};
-    resultDir = 'results2';
+    resultDir = 'results';
 
     %prot = 4;
     %type = 1;
