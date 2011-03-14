@@ -95,8 +95,8 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
                 axis([0 length(sortedSlacks) 0 10]);
             end
         end
-
     end
+    
     
     if getOrder,
         for t = 1:numel(typeRange),
