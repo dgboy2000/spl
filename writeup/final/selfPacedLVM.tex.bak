@@ -1,0 +1,867 @@
+\documentclass{article}
+\usepackage{nips10submit_e,times}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{epsfig}
+\usepackage{wrapfig}
+\usepackage[numbers]{natbib}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+
+\renewcommand{\baselinestretch}{.99}
+  
+\newcommand{\comment}[1]{}
+\newcommand{\mysection}[1]{\vspace{-4mm}\section{#1}\vspace{-4mm}}
+\newcommand{\mysubsection}[1]{\vspace{-3mm}\subsection{#1}\vspace{-3mm}}
+\newcommand{\myparagraph}[1]{\vspace{-2mm}\paragraph{#1}}
+\newcommand{\mycaption}[1]{\vspace{-3mm}\caption{\em \footnotesize #1}\vspace{-3mm}}
+\newcommand{\mytopcaption}[1]{\caption{\em \footnotesize #1}}
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+\newcommand{\twofigures}[5]{
+\renewcommand{\citename}{\citet}
+\begin{minipage}[t]{0.49\textwidth}
+\centerline{\psfig{figure=#1,height=#3}}
+\end{minipage}\hspace{0.01\textwidth}
+\begin{minipage}[t]{0.49\textwidth}
+\centerline{\psfig{figure=#2,height=#3}}
+\end{minipage}
+\raisebox{0mm}
+{\makebox[0.5\textwidth][c]{(#4)}\makebox[0.5\textwidth][c]{(#5)}}
+}
+\newcommand{\threefigures}[4]{
+\begin{minipage}[t]{0.32\textwidth}
+\centerline{\psfig{figure=#1,height=#4}}
+\end{minipage}\hspace{0.01\textwidth}
+\begin{minipage}[t]{0.32\textwidth}
+\centerline{\psfig{figure=#2,height=#4}}
+\end{minipage}\hspace{0.01\textwidth}
+\begin{minipage}[t]{0.32\textwidth}
+\centerline{\psfig{figure=#3,height=#4}}
+\end{minipage}
+}
+\newcommand{\threefigurescaps}[7]{
+\begin{minipage}[t]{0.32\textwidth}
+\centerline{\psfig{figure=#1,height=#4}}
+\end{minipage}\hspace{0.01\textwidth}
+\begin{minipage}[t]{0.32\textwidth}
+\centerline{\psfig{figure=#2,height=#4}}
+\end{minipage}\hspace{0.01\textwidth}
+\begin{minipage}[t]{0.32\textwidth}
+\centerline{\psfig{figure=#3,height=#4}}
+\end{minipage}
+\raisebox{0mm}
+{\makebox[0.32\textwidth][c]{(#5)}\makebox[0.32\textwidth][c]{(#6)}
+\makebox[0.32\textwidth][c]{(#7)}
+}
+}
+\newcommand{\argmin}{\operatornamewithlimits{argmin}}
+\newcommand{\argmax}{\operatornamewithlimits{argmax}}
+
+\title{Self-Paced Learning for Latent Variable Models}
+
+\author{
+M.\ Pawan Kumar ~~~~~ Benjamin Packer ~~~~~ Daphne Koller\\
+Computer Science Department \\
+Stanford University \\
+\texttt{\{pawan,bpacker,koller\}@cs.stanford.edu}
+}
+
+\nipsfinalcopy
+
+\begin{document} 
+
+\maketitle
+\vspace{-8mm}
+
+\begin{abstract}
+\vspace{-4mm}
+Latent variable models are a powerful tool for addressing several tasks
+in machine learning. However, the algorithms for learning the parameters
+of latent variable models are prone to getting stuck in a bad local optimum.
+To alleviate this problem, we build on the intuition
+that, rather than considering all samples simultaneously, the algorithm should be presented with the
+training data in a {\em meaningful} order that facilitates learning. 
+The order of the samples is determined by how {\em easy} they are. The main challenge
+is that often we are not provided with
+a readily computable measure of the easiness of samples. We address this issue by 
+proposing a novel, iterative {\em self-paced learning} algorithm where each iteration
+simultaneously selects easy samples and learns a new parameter vector.
+The number of samples selected is governed by
+a weight that is annealed until the entire training data has been considered.
+We empirically demonstrate that the
+self-paced learning algorithm outperforms the state of the art method for
+learning a latent structural {\sc svm} on
+four applications: object localization, noun phrase coreference, motif finding and handwritten digit recognition.
+\end{abstract}
+\vspace{-4mm}
+
+\mysection{Introduction}
+\label{sec:introduction}
+
+Latent variable models provide an elegant formulation for several applications
+of machine learning. For example, in
+computer vision, we may have many `car' images from which
+we wish to learn a `car' model. However, the exact location
+of the cars may be unknown and can be modeled as latent
+variables. In medical diagnosis, learning to diagnose a
+disease based on symptoms can be improved by treating unknown or
+unobserved diseases as latent variables (to deal with confounding
+factors). Learning the parameters of a latent variable model often
+requires solving a non-convex optimization problem. Some common approaches
+for obtaining an approximate solution include the well-known {\sc em}~\cite{dempsterjrss77}
+and {\sc cccp} algorithms~\cite{felzenszwalbcvpr08,yuicml09,yuillenc03}.
+However, these approaches are prone to getting stuck in a bad local minimum with
+high training and generalization error.
+
+Machine learning literature is filled with scenarios in which one is
+required to solve a non-convex optimization task, for example learning
+perceptrons or deep belief nets. A common approach for avoiding a bad
+local minimum in these cases is to use multiple runs with random
+initializations and pick the best solution amongst them (as
+determined, for example, by testing on a validation set). However,
+this approach is adhoc and computationally expensive as one may be required to
+use several runs to obtain an accurate solution.
+Bengio {\em et al.}~\cite{bengioicml09} recently proposed an
+alternative method for training with non-convex objectives, called
+curriculum learning. The idea is inspired by the way children are
+taught: start with easier concepts (for example, recognizing objects
+in simple scenes where an object is clearly visible) and build up to
+more complex ones (for example, cluttered images with occlusions).
+Curriculum learning suggests using the easy samples first and
+gradually introducing the learning algorithm to more complex ones.
+The main challenge in using the curriculum learning strategy is that
+it requires the identification of easy and hard samples in a given
+training dataset.  However, in many real-world applications, such a
+ranking of training samples may be onerous or conceptually difficult
+for a human to provide --- even if this additional human supervision
+can be provided, what is intuitively ``easy'' for a human may not
+match what is easy for the algorithm in the feature and hypothesis
+space employed for the given application.
+
+To alleviate these deficiencies, we introduce {\em self-paced
+learning}. In the context of human education, self-paced learning
+refers to a system where the curriculum is determined by the pupil's
+abilities rather than being fixed by a teacher. We build on this
+intuition for learning latent variable models by designing an
+iterative approach that simultaneously selects easy samples and
+updates the parameters at each iteration. The number of samples
+selected at each iteration is determined by a weight that is gradually
+annealed such that later iterations introduce more samples.  The
+algorithm converges when all samples have been considered and the
+objective function cannot be improved further.  Note that, in
+self-paced learning, the characterization of what is ``easy'' applies
+not to individual samples, but to sets of samples; {\em a set of
+samples is easy if it admits a good fit in the model space}.
+
+We empirically demonstrate that
+our self-paced learning approach outperforms the state of the art algorithm for
+learning a recently proposed latent variable model, called latent structural
+{\sc svm}, on four standard machine learning applications using publicly
+available datasets.
+
+\mysection{Related Work}
+\label{sec:relatedwork}
+Self-paced learning is related to curriculum learning in that both regimes
+suggest processing the samples in a meaningful order.
+Bengio {\em et al.\ }\cite{bengioicml09} noted that curriculum learning can be seen as
+a type of continuation method~\cite{allgower90}. However, in their work, they circumvented the
+challenge of obtaining such an ordering by using datasets where there is a clear distinction
+between easy and hard samples (for example, classifying equilateral triangles vs.\ squares is easier than
+classifying general triangles vs.\ general quadrilaterals). Such datasets are rarely available in
+real world applications, so it is not surprising that the experiments in~\cite{bengioicml09} were mostly
+restricted to small toy examples.
+
+Our approach also has a similar flavor to active learning, which
+chooses a sample to learn from at each iteration. Active learning approaches differ in their sample selection criteria.
+For example, Tong and Koller~\cite{tongjmlr01} suggest choosing a sample that is close to the margin (a ``hard'' sample),
+corresponding to {\em anti-curriculum learning}. Cohn {\em et al.\ }\cite{cohnjair96} advocate the use of the 
+most uncertain sample with respect to the current classifier. However, unlike our setting, in active learning the labels of all the samples are not known when the samples are
+chosen.
+
+Another related learning regime is co-training, which works by alternately training classifiers such that
+the most confidently labeled samples from one classifier are used to train the other~\cite{blumcolt98,nigamcikm00}.
+Our approach differs from co-training in that in our setting the latent variables are simply used to assist in predicting
+the target labels, which are always observed, whereas co-training deals with a semi-supervised setting in which some labels
+are missing. 
+
+\mysection{Preliminaries}
+\label{sec:preliminaries}
+
+We will denote the training data as ${\cal D} = \{({\bf x}_i,{\bf y}_i),\cdots,({\bf x}_n,{\bf y}_n)\}$, where ${\bf x}_i \in {\cal X}$
+are the observed variables (which we refer to as input) for the $i^{th}$ sample
+and ${\bf y}_i \in {\cal Y}$ are the unobserved variables (which we refer to as output),
+whose values are known during training. In addition, latent variable models also contain latent, or hidden, variables that we
+denote by ${\bf h}_i \in {\cal H}$.
+For example, when learning a `car' model using image-level labels, {\bf x} represents an image, the binary output {\bf y} indicates the presence or
+absence of a car in the image, and {\bf h} represents the car's bounding box (if present).
+
+Given the training data, the parameters {\bf w} of a latent variable model are learned by optimizing
+an objective function, for example by maximizing the likelihood of ${\cal D}$ or minimizing the risk over ${\cal D}$. Typically,
+the learning algorithm proceeds iteratively, with each iteration consisting of two stages: (i) the hidden variables are either imputed
+or marginalized to obtain an estimate of the objective function that only depends on {\bf w};
+and (ii) the esimate of the objective function is optimized to obtain a new set of parameters. We briefly describe two such well-known
+algorithms below.
+
+\paragraph{EM Algorithm for Likelihood Maximization.} An intuitive objective is to maximize likelihood:
+%An intuitive objective for learning the parameters {\bf w} would be to maximize the likelihood
+%of the training data ${\cal D}$, that is,
+\begin{equation}
+\max_{\bf w} \sum_i \log \Pr({\bf x}_i, {\bf y}_i; {\bf w}) = 
+\max_{\bf w} \left( \sum_i \log \Pr({\bf x}_i, {\bf y}_i, {\bf h}_i; {\bf w}) - 
+\sum_i \log \Pr({\bf h}_i | {\bf x}_i, {\bf y}_i; {\bf w})\right).
+\label{eq:maximumLikelihood}
+\end{equation}
+A common approach for this task is to use the {\sc
+em} method~\cite{dempsterjrss77} or one of its many
+variants~\cite{gelman95}.  Outlined in Algorithm~\ref{algo:EM}, {\sc
+em} iterates between finding the expected value of the latent variables
+{\bf h} and maximizing objective ~(\ref{eq:maximumLikelihood})
+subject to this expectation.
+%The key observation in {\sc em} is that at iteration $t$ the second term in the {\sc rhs} of objective~(\ref{eq:maximumLikelihood}) ---
+%$\sum_i \log \Pr({\bf h}_i | {\bf x}_i, {\bf y}_i; {\bf w})$ --- is maximized when ${\bf w} = {\bf w}_t$. Therefore the new parameters
+%${\bf w}_{t+1}$, which increase the likelihood, can be obtained by maximizing only the first term of 
+%objective~(\ref{eq:maximumLikelihood}) as shown in step 4 of
+%Algorithm~\ref{algo:EM}. The {\sc em} algorithm converges to a local minimum or saddle point solution.
+We refer the reader to~\cite{dempsterjrss77} for more details.
+
+\begin{algorithm}[h!]
+\mytopcaption{The {\sc em} algorithm for parameter estimation by likelihood maximization.}
+\label{algo:EM}
+\begin{algorithmic}[1]
+\INPUT ${\cal D} = \{({\bf x}_1,{\bf y}_1),\cdots,({\bf x}_n,{\bf y}_n)\}$, ${\bf w}_0$, $\epsilon$.
+\STATE $t \leftarrow 0$
+\REPEAT
+\STATE Obtain the expectation of objective~(\ref{eq:maximumLikelihood}) under the distribution
+$\Pr({\bf h}_i | {\bf x}_i, {\bf y}_i; {\bf w}_t)$.
+\STATE Update ${\bf w}_{t+1}$ by maximizing the expectation of objective~(\ref{eq:maximumLikelihood}). Specifically, \\
+${\bf w}_{t+1} = \argmax_{\bf w}\sum_i \Pr({\bf h}_i | {\bf x}_i, {\bf y}_i; {\bf w}_t)
+\log \Pr({\bf x}_i, {\bf y}_i, {\bf h}_i; {\bf w})$.
+\STATE $t \leftarrow t + 1$.
+\UNTIL{Objective function cannot be increased above tolerance $\epsilon$.}
+\end{algorithmic}
+\end{algorithm}
+
+
+\myparagraph{CCCP Algorithm for Risk Minimization.}
+
+Given the true output ${\bf y}$, we denote the user-specified risk of
+predicting $\hat{\bf y}({\bf w})$ as $\Delta({\bf y},\hat{\bf y}({\bf w}))$.
+The risk is usually highly non-convex in {\bf w}, and therefore very difficult
+to minimize. An efficient way to overcome this difficulty is to use the recently
+proposed latent structural support vector machine (hereby referred to as latent
+{\sc ssvm}) formulation~\cite{felzenszwalbcvpr08,yuicml09} that minimizes a
+regularized upper bound on the risk. Latent {\sc ssvm} provides a
+linear prediction rule of the form
+$f_{\bf w}({\bf x}) = \argmax_{{\bf y} \in {\cal Y},{\bf h}\in {\cal H}} {\bf w}^\top \Phi({\bf x},{\bf y},{\bf h})$.
+Here, $\Phi({\bf x},{\bf y},{\bf h})$ is the joint feature vector. For instance, in our `car' model learning example,
+the joint feature vector can be modeled as the {\sc hog}~\cite{dalalcvpr05}
+descriptor extracted using pixels in the bounding box {\bf h}.
+
+The parameters {\bf w} are learned by
+solving the following optimization problem:
+\begin{eqnarray}
+&&\min_{{\bf w},\xi_i \geq 0} \frac{1}{2}||{\bf w}||^2 + \frac{C}{n} \sum_{i=1}^n \xi_i, \nonumber \\
+\mbox{s.t. } && \max_{h_i \in {\cal H}} {\bf w}^\top \left(\Phi({\bf x}_i,{\bf y}_i,{\bf h}_i) - 
+		\Phi({\bf x}_i,\hat{\bf y}_i,\hat{\bf h}_i) \right)
+	 \geq \Delta({\bf y}_i,\hat{\bf y}_i) - \xi_i, \nonumber \\
+\label{eq:latentSSVM}
+&&\forall \hat{\bf y}_i \in {\cal Y}, \forall \hat{h}_i \in {\cal H}, i=1,\cdots,n.
+\end{eqnarray}
+For any given {\bf w}, the value of $\xi_i$ can be shown to be an upper bound on
+the risk $\Delta({\bf y}_i,\hat{{\bf y}}_i({\bf w}))$ (where $\hat{\bf y}_i({\bf w})$ is
+the predicted output given {\bf w}). The risk function can also
+depend on $\hat{\bf h}_i({\bf w})$; that is, it can be of the form
+$\Delta({\bf y}_i,\hat{\bf y}_i({\bf w}),\hat{\bf h}_i({\bf w}))$. We refer the reader to~\cite{yuicml09} for
+more details.
+
+Problem~(\ref{eq:latentSSVM}) can be viewed as minimizing the sum
+of a convex and a concave function. This observation leads to a
+concave-convex procedure ({\sc cccp})~\cite{yuillenc03} outlined in
+Algorithm~\ref{algo:latentSSVM}, which has been shown to converge to a
+local minimum or saddle point solution~\cite{sriperumbudurnips09}.
+The algorithm has two main steps: (i) imputing the hidden variables
+(step 3), which corresponds to approximating the concave function by a
+linear upper bound; and (ii) updating the value of the parameter using
+the values of the hidden variables.  Note that updating the parameters
+requires us to solve a convex {\sc ssvm} learning problem (where the output
+${\bf y}_i$ is now concatenated with the hidden variable ${\bf h}_i^*$) for
+which several efficient algorithms exist
+in the literature~\cite{joachimsml09,taskarnips03,tsochantaridisicml04}.
+
+\begin{algorithm}[h!]
+\mytopcaption{The {\sc cccp} algorithm for parameter estimation of latent {\sc ssvm}.}
+\label{algo:latentSSVM}
+\begin{algorithmic}[1]
+\INPUT ${\cal D} = \{({\bf x}_1,{\bf y}_1),\cdots,({\bf x}_n,{\bf y}_n)\}$, ${\bf w}_0$, $\epsilon$.
+\STATE $t \leftarrow 0$
+\REPEAT
+\STATE Update ${\bf h}_i^* = \argmax_{h_i \in {\cal H}} {\bf w}_{t}^\top \Phi({\bf x}_i,{\bf y}_i,{\bf h}_i)$.
+\STATE Update ${\bf w}_{t+1}$ by fixing the hidden variables for output ${\bf y}_i$ to ${\bf h}_i^*$ and solving the corresponding
+{\sc ssvm} problem. Specifically, \\
+${\bf w}_{t+1} = \argmin_{\bf w} \frac{1}{2}||{\bf w}||^2 + \frac{C}{n}\sum_i \max\{0,\Delta({\bf y}_i,\hat{\bf y}_i) +
+		{\bf w}^\top (\Phi({\bf x}_i,\hat{\bf y}_i,\hat{\bf h}_i) - \Phi({\bf x}_i,{\bf y}_i,{\bf h}_i^*))\}$.
+\STATE $t \leftarrow t + 1$.
+\UNTIL{Objective function cannot be decreased below tolerance $\epsilon$.}
+\end{algorithmic}
+\end{algorithm}
+
+\mysection{Self-Paced Learning for Latent Variable Models}
+\label{sec:selfPacedLVM}
+Our self-paced learning strategy alleviates the
+main difficulty of curriculum learning, namely the lack of a readily
+computable measure of the {\em easiness} of a sample. In the context
+of a latent variable model, for a given parameter {\bf w}, this easiness
+can be defined in two ways: (i) a
+sample is easy if we are confident about the value of a hidden
+variable; or (ii) a sample is easy if it is easy to predict
+its true output. The two
+definitions are somewhat related: if we are more certain about the
+hidden variable, we may be more certain about the prediction. They are
+different in that certainty does not imply correctness, and the hidden
+variables may not be directly relevant to what makes the output of
+a sample easy to predict. 
+We therefore focus on the second definition: easy samples are ones
+whose correct output can be predicted easily (its likelihood is
+high, or it lies far from the margin).
+
+In the above argument, we have assumed a given {\bf w}. However, in
+order to operationalize self-paced learning, we need a strategy for
+simultaneously selecting the easy samples and learning the parameter
+{\bf w} at each iteration. To this end, we note that the parameter
+update involves optimizing an objective function that depends on
+{\bf w} (for example, see step 4 of both Algorithms~\ref{algo:EM} and~\ref{algo:latentSSVM}). That is,
+\begin{equation}
+{\bf w}_{t+1} = \argmin_{{\bf w} \in \mathbb{R}^d} \left(r({\bf w}) + \sum_{i=1}^n f({\bf x}_i,{\bf y}_i; {\bf w})\right),
+\label{eq:parameterUpdate}
+\end{equation}
+where $r(.)$ is a regularization function and $f(.)$ is the negative log-likelihood for {\sc em}
+or an upper bound on the risk for latent {\sc ssvm} (or any other criteria for parameter learning).
+We now modify
+the above optimization problem by introducing binary variables $v_i$ that
+indicate whether the $i^{th}$ sample is easy or not. Only easy samples contribute to the objective function.
+Formally, at each iteration we solve the following mixed-integer
+program:
+\begin{equation}
+({\bf w}_{t+1}, {\bf v}_{t+1}) = \argmin_{{\bf w} \in \mathbb{R}^d,{\bf v} \in \{0,1\}^n}
+\left(r({\bf w}) + \sum_{i=1}^n v_if({\bf x}_i,{\bf y}_i; {\bf w}) -
+\frac{1}{K}\sum_{i=1}^n v_i\right).
+\label{eq:selfPacedMIP}
+\end{equation}
+$K$ is a weight that determines the number of samples to be
+considered: if $K$ is large, the problem prefers to consider only
+``easy'' samples with a small value of $f(.)$ (high likelihood, or far
+from the margin). Importantly, however, the samples are tied together
+in the objective through the parameter ${\bf w}$. Therefore, no sample
+is considered independently easy; rather, a \emph{set} of samples is
+easy if a ${\bf w}$ can be fit to it such that the corresponding
+values of $f(.)$ are small.  We iteratively decrease the value of $K$
+in order to estimate the parameters of a latent variable model via
+self-paced learning. As $K$ approaches $0$, more samples are included
+until problem~(\ref{eq:selfPacedMIP}) reduces to
+problem~(\ref{eq:parameterUpdate}). We thus begin with only a few easy
+examples, gradually introducing more until the entire training dataset
+is used.
+
+To optimize problem~(\ref{eq:selfPacedMIP}), we note that it can be relaxed such that each variable $v_i$ is allowed to take any value
+in the interval $[0,1]$. This relaxation is {\em tight}; that is, for any value
+of {\bf w} an optimum value of $v_i$ is either $0$ or $1$ for all samples. 
+If $f({\bf x}_i,{\bf y}_i;{\bf w}) < 1/K$ then $v_i = 1$ yields the optimal objective function value. Similarly, if
+$f({\bf x}_i,{\bf y}_i;{\bf w}) > 1/K$ then the objective is optimal when $v_i = 0$. 
+
+Relaxing problem~(\ref{eq:selfPacedMIP}) allows us to identify special cases
+where the optimum parameter update can be found efficiently. One such special case is when $r(.)$
+and $f(.)$ are convex in ${\bf w}$, as in the latent {\sc ssvm} parameter update. In this case, the
+relaxation of problem~(\ref{eq:selfPacedMIP}) is a biconvex optimization problem.
+Recall that a biconvex problem is one
+where the variables {\bf z} can be divided into two sets ${\bf z}_1$
+and ${\bf z}_2$ such that for a fixed value of each set, the optimal
+value of the other set can be obtained by solving a convex
+optimization problem. In our case, the two sets of variables are
+{\bf w} and {\bf v}. Biconvex problems have a vast literature, with both global~\cite{floudasjota93}
+and local~\cite{bazaraa93} optimization techniques. In this work, we use alternative convex search ({\sc acs})~\cite{bazaraa93}, which alternatively optimizes
+{\bf w} and {\bf v} while keeping the other set of variables fixed. We found in our experiments 
+that {\sc acs} obtained accurate results.
+
+Even in the general case with non-convex $r(.)$ and/or $f(.)$, we can use the alternative search strategy to efficiently
+obtain an approximate solution for problem~(\ref{eq:selfPacedMIP}). Given parameters {\bf w}, we can obtain the optimum
+{\bf v} as $v_i = \delta(f({\bf x}_i,{\bf y}_i;{\bf w}) < 1/K)$, where $\delta(.)$ is the indicator function.
+For a fixed {\bf v}, problem~(\ref{eq:selfPacedMIP}) has the same form as problem~(\ref{eq:parameterUpdate}). Thus, the
+optimization for self-paced learning is as easy (or as difficult) as the original parameter learning algorithm.
+
+\myparagraph{Self-Paced Learning for Latent SSVM.} As an illustrative
+example of self-paced learning,
+%we consider the task of learning the
+%parameters of a latent {\sc ssvm}.
+Algorithm~\ref{algo:selfPacedLatentSSVM} outlines the overall
+self-paced learning method for latent {\sc ssvm}, which involves
+solving a modified version of problem~(\ref{eq:latentSSVM}).  At each
+iteration, the weight $K$ is reduced by a factor of $\mu > 1$,
+introducing more and more (difficult) samples from one iteration to
+the next.  The algorithm converges when it considers all samples but
+is unable to decrease the latent {\sc ssvm} objective function value
+below the tolerance $\epsilon$.  We note that self-paced learning
+provides the same guarantees as {\sc cccp}:\\ {\bf Property:}
+Algorithm~\ref{algo:selfPacedLatentSSVM} converges to a local minimum
+or saddle point solution of problem~(\ref{eq:latentSSVM}). \\ This
+follows from the fact that the last iteration of
+Algorithm~\ref{algo:selfPacedLatentSSVM} is
+%simply
+the original {\sc
+cccp} algorithm.
+
+\begin{algorithm}[h!]
+\mytopcaption{The self-paced learning algorithm for parameter estimation of latent {\sc ssvm}.}
+\label{algo:selfPacedLatentSSVM}
+\begin{algorithmic}[1]
+\INPUT ${\cal D} = \{({\bf x}_1,{\bf y}_1),\cdots,({\bf x}_n,{\bf y}_n)\}$, ${\bf w}_0$, $K_0$, $\epsilon$.
+\STATE $t \leftarrow 0$, $K \leftarrow K_0$.
+\REPEAT
+\STATE Update $h_i^* = \argmax_{h_i \in {\cal H}} {\bf w}_{t}^\top \Phi({\bf x}_i,{\bf y}_i,{\bf h}_i)$.
+\STATE Update ${\bf w}_{t+1}$ by using {\sc acs} to optimize the objective
+$\frac{1}{2}||{\bf w}||^2 + \frac{C}{n} \sum_{i=1}^n v_i\xi_i - \frac{1}{K} \sum_{i=1}^n v_i$ subject to the
+constraints of problem~(\ref{eq:latentSSVM}) as
+well as ${\bf v} \in \{0,1\}^n$.
+\STATE $t \leftarrow t + 1$, $K \leftarrow K/\mu$.
+\UNTIL{$v_i = 1, \forall i$ and the objective function cannot be decreased below tolerance $\epsilon$.}
+\end{algorithmic}
+\end{algorithm}
+
+%In this case, we solve a modified version of problem~(\ref{eq:latentSSVM}), as shown in Algorithm~\ref{algo:selfPacedLatentSSVM}.
+%\begin{equation}
+% \label{eq:latentSSVMsp}
+%\end{equation}
+%$$\frac{1}{2}||{\bf w}||^2 + \frac{C}{n} \sum_{i=1}^n v_i\xi_i - \frac{1}{K} \sum_{i=1}^n v_i$$
+%\label{eq:latentSSVMsp}
+%\end{eqnarray}
+%% solving the following
+%% biconvex problem:
+%% \begin{eqnarray}
+%% &&\min_{{\bf w}\in \mathbb{R}^d,{\bf v}\in [0,1]^n,\xi_i \geq 0}
+%% \frac{1}{2}||{\bf w}||^2 + \frac{C}{n} \sum_{i=1}^n v_i\xi_i - \frac{1}{K} \sum_{i=1}^n v_i, \nonumber \\
+%% \mbox{s.t. }  && {\bf v} \in \{0,1\}^n, \nonumber \\
+%% &&{\bf w}^\top \left( \Phi({\bf x}_i,{\bf y}_i,{\bf h}_i^*) - \Phi({\bf x}_i,\hat{\bf y}_i,\hat{\bf h}_i) \right) \geq
+%% \Delta({\bf y}_i,\hat{\bf y}_i,\hat{\bf h}_i)  - \xi_i,  \nonumber \\
+%% \label{eq:latentSSVMUpdate}
+%% && \forall \hat{\bf y}_i \in {\cal Y}, \hat{\bf h}_i \in {\cal H}, i=1,\cdots,n,
+%% \end{eqnarray}
+%% where ${\bf h}_i^*$ is the current imputed value of the hidden variable of the $i^{th}$ sample.
+
+Our algorithm requires an initial parameter ${\bf w}_0$ (similar to {\sc cccp}). 
+In our experiments, we obtained an estimate of ${\bf w}_0$ by
+initially setting $v_i = 1$ for all samples and running the original
+{\sc cccp} algorithm for a fixed, small number of iterations $T_0$. 
+As our results indicate, this simple strategy was sufficient to obtain
+an accurate set of parameters using self-paced learning. 
+
+
+\mysection{Experiments}
+\label{sec:experiments}
+We now demonstrate the efficacy of self-paced learning in the context
+of latent {\sc ssvm}. We show that our approach outperforms the
+state of the art {\sc cccp} algorithm on four standard machine learning
+applications. In all our
+experiments, the initial weight $K_0$ is set such that the
+first iteration selects more than half the samples (as there are
+typically more easy samples than difficult ones).
+The weight is reduced by a factor $\mu = 1.3$ at each iteration
+and the parameters are initialized using $T_0 = 2$ iterations of the original
+{\sc cccp} algorithm.
+
+\mysubsection{Noun Phrase Coreference}
+\label{subsec:nounphrase}
+
+\paragraph{Problem Formulation.}
+Given the occurrence of all the nouns in a document,
+the goal of noun phrase coreference is to provide a clustering of the nouns such that each cluster
+refers to a single object. This task was formulated within the {\sc ssvm} framework in~\cite{finleyicml05}
+and extended to include latent variables in~\cite{yuicml09}. Formally, the input vector {\bf x}
+consists of the pairwise features ${\bf x}_{ij}$ suggested in~\cite{ngacl02}
+between all pairs of noun phrases $i$ and $j$ in the document.
+The output ${\bf y}$ represents a clustering of the nouns. A hidden variable {\bf h} specifies a
+forest over the nouns such that each tree in the forest consists of all the nouns of one cluster.
+Imputing the hidden variables involves finding the maximum spanning
+forest (which can be solved by Kruskal or Prims algorithm).
+Similar to~\cite{yuicml09}, we employ two different loss functions, corresponding to the 
+pairwise and {\sc mitre} scores.
+
+\myparagraph{Dataset.} We use the publicly available MUC6 noun phrase coreference dataset, which consists
+of 60 documents. We use the same split of 30 training and 30 test documents as~\cite{yuicml09}.
+
+\myparagraph{Results.}
+\begin{figure}
+\threefigurescaps{figures/np.relobj.eps}{figures/np.trainloss.eps}{figures/np.testloss.eps}{3.25cm}{a}{b}{c}
+\mycaption{\it Results for the noun phrase coreference experiment. Top: {\sc mitre} score. Bottom:
+Pairwise score.
+(a) The relative objective value computed as
+$(obj_{cccp}-obj_{spl})/obj_{cccp}$, where $obj_{cccp}$ and $obj_{spl}$ are the objective values of
+{\sc cccp} and self-paced learning respectively. A green circle indicates a significant improvement (greater than tolerance $C\epsilon$),
+while a red circle indicates a significant decline. The black dashed line demarcates equal
+objective values. (b) Loss over the training data. Minimum {\sc mitre} loss: $14.48$ and $14.02$ for {\sc cccp} and
+self-paced learning respectively;
+Minimum pairwise loss: $31.10$ and $31.03$. (c) Loss over the test data. Minimum {\sc mitre} loss: $15.38$ and $14.91$;
+Minimum pairwise loss: $34.10$ and $33.93$.
+}
+\label{fig:nounphrase}
+\end{figure}
+We tested {\sc cccp} and our self-paced learning method on different
+values of $C$;  the average training times over all $40$ experiments
+($20$ different values of $C$ and two different loss functions) for
+the two methods were $1183$ and $1080$ seconds respectively. 
+Fig.~\ref{fig:nounphrase} compares the two methods in terms of the
+value of the objective function (which is the main focus of this
+work), the loss over the training data and the loss over the test
+data. Note that self-paced learning significantly improves the
+objective function value in $11$ of the $40$ experiments (compared to
+only once when {\sc cccp} outperforms self-paced
+learning; see Fig.~\ref{fig:nounphrase}(a)). 
+It also provides a better training and testing loss for both {\sc mitre}
+and pairwise scores when using the optimal value of $C$ (see Fig.~\ref{fig:nounphrase}(b)-(c)).
+
+\mysubsection{Motif Finding}
+\label{subsec:motif}
+
+\paragraph{Problem Formulation.}
+We consider the problem of binary classification of {\sc dna} sequences, which was cast as a latent {\sc ssvm} 
+in~\cite{yuicml09}. Specifically, the input vector {\bf x} consists of a {\sc dna} sequence of length
+$l$ (where each element of the sequence is a nucleotide of type A, G, T or C) and the output space ${\cal Y} = \{+1,-1\}$.
+In our experiments, the classes correspond to two different types of
+genes: those that bind to a protein of interest with high
+affinity and those that do not. The positive sequences are assumed to
+contain particular patterns, called \emph{motifs}, of length $m$ that
+are believed to be useful for classification. However, the starting
+position of the motif within a gene sequence is often not known.
+Hence, this position is treated as the hidden variable
+${\bf h}$. For this problem, we use the joint feature vector suggested
+by~\cite{yuicml09}.
+Here, imputing the hidden variables simply involves a search
+for the starting position of the motif. The loss function $\Delta$ is the
+standard 0-1 classification loss.
+
+\myparagraph{Dataset.} We use the publicly available UniProbe dataset~\cite{bergercell08} that provides positive
+and negative {\sc dna} sequences for $177$ proteins. For this work, we chose five proteins at random. The total
+number of sequences per protein is roughly $40,000$.
+For all the sequences, the motif length $m$ is known (provided with the UniProbe dataset)
+and the background Markov model is assumed to be of order $k=3$.
+In order to specify a classification task for a particular protein, we randomly split the sequences into roughly 50\% 
+for training and 50\% for testing.
+\begin{table}[h!]
+\small
+\begin{center}
+(a) Objective function value \\
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline
+{\sc cccp} & $92.77 \pm 0.99$ & ${\bf 106.50 \pm 0.38}$ & $94.00 \pm 0.53$ & $116.63 \pm 18.78$ & $75.51 \pm 1.97$ \\ 
+{\sc spl} & ${\bf 92.37 \pm 0.65}$ & $106.60 \pm 0.30$ & ${\bf 93.51 \pm 0.29}$ & ${\bf 107.18 \pm 1.48}$ & ${\bf 74.23 \pm 0.59}$ \\
+\hline
+\end{tabular} 
+\vspace{1mm}
+\\(b) Training error (\%) \\
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline
+{\sc cccp} & $27.10 \pm 0.44$ & ${\bf 32.03 \pm 0.31}$ & $26.90 \pm 0.28$ & $34.89 \pm 8.53$ & $20.09 \pm 0.81$ \\
+{\sc spl} & ${\bf 26.94 \pm 0.26}$ & $32.04 \pm 0.23$ & ${\bf 26.81 \pm 0.19}$ & ${\bf 30.31 \pm 1.14}$ & ${\bf 19.52 \pm 0.34}$ \\
+\hline
+\end{tabular}
+\vspace{1mm}
+\\(c) Test error (\%) \\
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline
+{\sc cccp} & $27.10 \pm 0.36$ & ${\bf 32.15 \pm 0.31}$ & $27.10 \pm 0.37$ & $35.42 \pm 8.19$ & $20.25 \pm 0.65$ \\
+{\sc spl} & ${\bf 27.08 \pm 0.38}$ & $32.24 \pm 0.25$ & ${\bf 27.03 \pm 0.13}$ & ${\bf 30.84 \pm 1.38}$ & ${\bf 19.65 \pm 0.39}$ \\
+\hline
+\end{tabular}
+\end{center}
+\mycaption{\it Mean and standard deviations for the motif finding experiments using the original {\sc cccp} algorithm (top row) and the proposed
+self-paced learning approach (bottom row). The better mean value is highlighted in bold. Note that self-paced learning
+provides an improved objective value (the primary concern of this work)
+for all proteins. The
+improvement in objective value also translates to an improvement in training and test errors.}
+\label{table:motif}
+\end{table}
+
+
+\myparagraph{Results.} 
+We used five different folds for each protein, randomly initializing
+the motif positions for all training samples using four different seed
+values (fixed for both methods). We report results for each method
+using the best seed (chosen according to the value of the objective
+function). For all experiments we use $C=150$ and $\epsilon=0.001$
+(the large size of the dataset made cross-validation highly time
+consuming). The average time over all $100$ runs for {\sc cccp} and
+self-paced learning are $824$ and $1287$ seconds respectively. 
+Although our approach is slower than {\sc cccp} for this application, as 
+table~\ref{table:motif} shows, it learns a better set of parameters.
+While improvements for most folds are small, for the fourth protein,
+{\sc cccp} gets stuck in a bad local minimum despite using  multiple
+random initializations (this is indicated by the large mean and
+standard deviation values).  This behavior is to be expected: in many
+cases, the objective function landscape is such that {\sc cccp} avoids
+local optima; but in some cases, {\sc cccp} gets stuck in poor local
+optimum.  Indeed, over all the $100$ runs ($5$ proteins, $5$ folds and
+$4$ seed values) {\sc cccp} got stuck in a bad local minimum $18$
+times (where a bad local minimum is one that gave $50\%$ test error)
+compared to $1$ run where self-paced learning got stuck. 
+
+Fig.~\ref{fig:motif} shows the average Hamming distance between the
+motifs of the selected samples at each iteration of the self-paced learning algorithm.
+Note that initially the algorithm selects samples whose motifs have
+a low Hamming distance (which intuitively correspond to the easy samples for this application).
+It then gradually introduces more difficult samples (as indicated by the rise in the average Hamming
+distance). Finally, it considers all samples and attempts to find the most discriminative motif across the entire dataset.
+Note that the motifs found over the entire dataset using self-paced
+learning provide a smaller average Hamming distance than those found
+using the original {\sc cccp} algorithm, indicating a greater
+coherence for the resulting output.
+
+\begin{figure}
+\threefigures{figures/motif_005_3.hamming.eps}{figures/motif_001_5.hamming.eps}{figures/motif_002_2.hamming.eps}{3.25cm}
+\mycaption{\it Average Hamming distance between the motifs found in all selected samples at each iteration. 
+Our approach starts with easy samples (small Hamming distance) and gradually introduces more difficult samples (large
+Hamming distance) until it starts to consider all samples of the training set. The figure shows results for three
+different protein-fold pairs. The average Hamming distance (over all proteins and folds) of the motifs obtained at convergence
+are $0.6155$ for {\sc cccp} and $0.6099$ for self-paced learning.}
+\label{fig:motif}
+\end{figure}
+
+\mysubsection{Handwritten Digit Recognition}
+\label{subsec:digits}
+
+\paragraph{Problem Formulation.}
+Handwritten digit recognition is a special case of multi-label classification, and hence
+can be formulated within the {\sc ssvm} framework.
+Specifically, given an input vector {\bf x}, which consists of $m$ grayscale values
+that represent an image of a handwritten digit, our aim is to predict the digit.
+In other words, ${\cal Y} = \{0,1,\cdots,9\}$. It is well-known that the accuracy
+of digit recognition can be greatly improved by explicitly modeling the deformations
+present in each image, for example see~\cite{simardnips91}. For simplicity, we assume that
+the deformations are restricted to an arbitrary rotation of the image, where the 
+angle of rotation is not known beforehand. This angle (which takes a value from
+a finite discrete set) is modeled as the hidden variable
+{\bf h}. We specify the joint feature vector as
+$\Phi({\bf x},{\bf y},{\bf h}) = ({\bf 0}_{{\bf y}(m+1)};\theta_{\bf
+  h}({\bf x})\ 1;{\bf 0}_{(9-{\bf y})(m+1)})$, 
+where $\theta_{\bf h}({\bf x})$ is the vector representation of the
+image {\bf x} rotated by 
+the angle corresponding to ${\bf h}$.
+In other words, the joint feature vector is the rotated image of the digit
+which is padded in the front and back with the appropriate number of
+zeroes. Imputing the hidden variables simply involves a search over a
+discrete set of angles.  Similar to the motif finding experiment, we
+use the standard 0-1 classification loss.
+
+\myparagraph{Dataset.}
+
+We use the standard {\sc mnist} dataset~\cite{lecunieee98}, which
+represents each handwritten digit as a vector of length 784 (that is,
+an image of size $28\times 28$). For efficiency, we use {\sc pca} to
+reduce the dimensionality of each sample to $10$. We perform binary
+classification on four difficult digit pairs ($1$-$7$, $2$-$7$,
+$3$-$8$, and $8$-$9$), as in \cite{zhangicml07}. The training standard
+dataset size for each digit ranges from $5,851$ to $6,742$, and the
+test sets range from $974$ to $1,135$ digits. The rotation modeled by
+the hidden variable can take one of $11$ discrete values, evenly
+spaced between $-60$ and $60$ degrees.
+
+\myparagraph{Results.}
+
+For each digit pair, we use $C$ values ranging from $25$ to $300$, set
+$\epsilon=0.001$, and set $K = \frac{10^4}{C}$. Modeling rotation as a
+hidden variable significantly improves classification performance,
+allowing the images to be better aligned with each other. Across all
+experiments for both learning methods, using hidden variables achieves
+better test error; the improvement over using no hidden variables is
+12\%, 8\%, 11\%, and 22\%, respectively, for the four digit
+pairs. {\sc cccp} learning took an average of $18$ minutes across all
+runs, while self-paced learning took an average of $53$ minutes.
+
+\begin{figure}[t]
+  \begin{tabular}{cccc}
+    \hspace{-0.1in}
+    \epsfig{file=figures/zero.PC.10.N0.NC2.I17.eps,width=0.23\columnwidth} &
+    \epsfig{file=figures/zero.PC.10.N0.NC2.I27.eps,width=0.23\columnwidth} &
+    \epsfig{file=figures/zero.PC.10.N0.NC2.I38.eps,width=0.23\columnwidth} &
+    \epsfig{file=figures/zero.PC.10.N0.NC2.I89.eps,width=0.23\columnwidth}
+  \end{tabular}
+  \mycaption{Four digit pairs from {\sc mnist}: $1$-$7$, $2$-$7$, $3$-$8$, $8$-$9$.  Relative objective
+        is computed as in Fig.~\ref{fig:nounphrase}.  Positive values
+        indicate superior results for self-paced learning. The dotted
+        black lines delineate where the difference is greater than the
+        convergence criteria range ($C\epsilon$); differences outside
+        this range are highlighted in blue.}
+\label{fig:mnist}
+\end{figure}
+%% \begin{figure}[th]
+%%   \begin{tabular}{cc}
+%%     \begin{minipage}{0.6\columnwidth}
+%%       \begin{tabular}{cc}
+%%         \epsfig{file=figures/zero.PC.10.N0.NC2.I17.eps,width=0.5\columnwidth} &
+%%         \epsfig{file=figures/zero.PC.10.N0.NC2.I27.eps,width=0.5\columnwidth} \\
+%%         \epsfig{file=figures/zero.PC.10.N0.NC2.I38.eps,width=0.5\columnwidth} &
+%%         \epsfig{file=figures/zero.PC.10.N0.NC2.I89.eps,width=0.5\columnwidth}
+%%       \end{tabular}
+%%     \end{minipage} &
+%%     \hspace{0.1in}
+%%     \begin{minipage}{0.3\columnwidth}
+%%       \mycaption{Four digit pairs from the {\sc mnist}
+%%         dataset. Clockwise from the upper left: $1$ vs. $7$, $2$
+%%         vs. $7$, $3$ vs. $8$, $8$ vs. $9$.  Relative primal objective
+%%         is the difference between the curriculum learning and {\sc
+%%         cccp} objective divided by the {\sc cccp} objective. Positive
+%%         values indicate superior results for curriculum learning. The
+%%         dotted black lines delineate where the difference is greater
+%%         than the convergence criteria range ($C\epsilon$), and
+%%         differences outside of this range are highlighted in blue.}
+%%     \end{minipage}
+%% \label{fig:mnist}
+%%   \end{tabular}
+%% \end{figure}
+%% \begin{figure}[th]
+%%   \begin{tabular}{c|c}
+%%     \begin{minipage}{0.3\columnwidth}
+%%       \epsfig{file=figures/zero.PC.10.N0.NC2.I17.eps,width=1.0\columnwidth}
+%%     \end{minipage} &
+%%     \begin{minipage}{0.6\columnwidth}
+%%       \begin{tabular}{c|c}
+%%         \epsfig{file=figures/zero.PC.10.N0.NC2.I27.eps,width=0.5\columnwidth} &
+%%         \epsfig{file=figures/zero.PC.10.N0.NC2.I38.eps,width=0.5\columnwidth} \\
+%%       \end{tabular}
+%%     \end{minipage} \\
+%%     \begin{minipage}{0.3\columnwidth}
+%%       \epsfig{file=figures/zero.PC.10.N0.NC2.I89.eps,width=1.0\columnwidth}
+%%     \end{minipage} &
+%%     \begin{minipage}{0.65\columnwidth}
+%%       \mycaption{Four digit pairs from the {\sc mnist}
+%%         dataset. Relative primal objective is computed as in Fig.~\ref{fig:nounphrase}.
+%%         Positive values indicate superior results for self-paced
+%%         learning. The dotted black lines delineate where the difference is
+%%         greater than the convergence criteria range ($C\epsilon$), and
+%%         differences outside of this range are highlighted in blue.}
+%%     \end{minipage}
+%%   \end{tabular}
+%%   \label{fig:mnist}
+%% \end{figure}
+
+The above figure compares the training and test errors and
+objective values between {\sc cccp} and self-paced
+learning. Self-paced learning achieves significantly better values in $15$
+runs, and is worse in $4$ runs, demonstrating that it
+helps find better solutions to the optimization problems. Though 
+training and test errors do not necessarily correlate to objective
+values, the best test error across $C$ values is better for self-paced
+learning for one of the digit pairs ($1$-$7$), and is the same for
+the others.
+
+\mysubsection{Object Localization}
+\label{subsec:objectLocalize}
+
+\paragraph{Problem Formulation.} Given a set of images along with
+labels that indicate the presence of a particular object
+category in the image (for example, a mammal), 
+our goal is to learn discriminative object models for all object categories (that is, models
+that can distinguish between one object, say bison, from another, say
+elephant). In practice, although it is easy to mine such images from
+free photo-sharing websites such as Flickr, it is burdensome to obtain
+ground truth annotations of the exact location of the object in each
+image. To avoid requiring these human annotations, we model
+the location of objects as hidden variables. Formally, for a given
+image {\bf x}, category {\bf y} and location {\bf h}, the score 
+is modelled as ${\bf w}^T\Phi({\bf x},{\bf y},{\bf h}) = {\bf w}_{\bf
+  y}^T \Phi_{\bf h}({\bf x})$, where ${\bf w}_{\bf y}$ are the
+parameters that corresponds to the class {\bf y} and $\Phi_{\bf
+  h}(\cdot)$ is the {\sc hog}~\cite{dalalcvpr05,felzenszwalbcvpr08}
+feature extracted from the image at position {\bf h} (the size of 
+the object is assumed to be the same for all images --- a reasonable assumption for our datasets).
+For the above problem, imputing the hidden variables involves a simple
+search over possible locations in a given image.  The loss function
+$\Delta({\bf y},\hat{\bf y})$ is again the standard 0-1 classification loss.
+
+\myparagraph{Dataset.} We use images of $6$ different mammals (approximately $45$ images per mammal) that have been
+previously employed for object localization~\cite{heitzijcv09}. We split the images of each category into approximately
+90\% for training and 10\% for testing.
+
+\myparagraph{Results.} We use five different folds to compare our method with the state of the art
+{\sc cccp} algorithm. For each fold, we randomly initialized the location of the object in each image (the
+initialization was the same for the two methods). We used a value of $C = 10$ and $\epsilon = 0.001$.
+The average training time over all folds were $362$ seconds and
+$482$ seconds for {\sc cccp} and self-paced learning respectively. Table~\ref{table:objectLocalize} shows the
+mean and standard deviation of three terms: the objective value, the training loss and the testing loss.
+Self-paced learning provided a significantly lower (more than tolerance) objective value
+than {\sc cccp} for all folds. The better objective value resulted in a substantial improvement in the training
+(for $4$ folds) and testing loss (an improvement of approximately 4\%
+for achieved for 2 folds). In these experiments, {\sc cccp} never
+outperformed self-paced learning for any of the three measures of
+performance. 
+\begin{table}[h!]
+\small
+\begin{center}
+\begin{tabular}{|c|c|c|}
+\hline
+Objective & Train Loss (\%) & Test Loss (\%) \\
+4.70 $\pm$ 0.11 & 0.33 $\pm$ 0.18  & 16.92 $\pm$ 5.16 \\
+\hline
+\end{tabular} 
+\begin{tabular}{|c|c|c|}
+\hline
+Objective & Train Loss (\%) & Test Loss (\%) \\
+{\bf 4.53 $\pm$ 0.15} & {\bf 0.0 $\pm$ 0.0}  & {\bf 15.38 $\pm$ 3.85} \\
+\hline
+\end{tabular} 
+\end{center}
+\mycaption{\it Results for the object localization experiment. Left: {\sc cccp}. Right: Self-paced learning. Note that
+self-paced learning provides better results for all measures of performance.}
+\label{table:objectLocalize}
+\end{table}
+
+Fig.~\ref{fig:objectLocalize} shows the imputed bounding boxes for two images during various iterations of the
+two algorithms. The proposed self-paced learning algorithm does not use the hard image during the
+initial iterations (as indicated by the red bounding box). In contrast, {\sc cccp} considers all images at
+each iteration. Note that self-paced learning provides a more accurate bounding box for the hard image at
+convergence, thereby illustrating the importance of learning in a meaningful order.
+In our experience, this was a typical behavior of the two algorithms.
+
+\begin{figure}
+\centerline{\psfig{file=figures/object_localization.eps,width=0.95\textwidth}}
+\mycaption{\it The top row shows the imputed bounding boxes of an easy
+and a hard image using the {\sc cccp} algorithm over increasing
+iterations (left to right). Note that for the hard (deer) image, the bounding
+box obtained at convergence does not localize the object
+accurately. In contrast, the self-paced learning approach (bottom row)
+does not use the hard image during initial iterations (indicated by
+the red color of the bounding box). In subsequent iterations, it is
+able to impute accurate bounding boxes for both the easy and hard
+image.}
+\label{fig:objectLocalize}
+\end{figure}
+
+
+\mysection{Discussion}
+\label{sec:discussion}
+We proposed the self-paced learning regime in the context of
+parameter estimation for latent variable models. Our method works by iteratively
+solving a biconvex optimization problem that simultaneously
+selects easy samples and updates the parameters. 
+Using four standard datasets from disparate domains
+(natural language processing, computational biology and
+computer vision) we showed that our method outperforms the state
+of the art approach.
+
+In the current work, we solve the biconvex optimization problem using
+an alternate convex search strategy, which only provides us with a
+local minimum solution. Although our results indicate that such a
+strategy is more accurate than the state of the art, it is worth noting that
+the biconvex problem can also be solved using a global optimization
+procedure, for example the one described in~\cite{floudasjota93}.
+This is a valuable direction for future work. We are also currently
+investigating the benefits of self-paced learning on other computer vision
+applications, where the ability to handle large and rapidly growing weakly supervised data
+is fundamental to the success of the field.
+
+\myparagraph{Acknowledgements.}
+This work is supported by NSF under grant IIS 0917151, MURI contract N000140710747, and the Boeing company.
+
+\newpage
+
+\bibliographystyle{plain}
+\bibliography{selfPacedLVM}
+
+\end{document} 

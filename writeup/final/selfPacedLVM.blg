@@ -1,0 +1,45 @@
+This is BibTeX, Version 0.99c (Web2C 7.5.4)
+The top-level auxiliary file: selfPacedLVM.aux
+The style file: plain.bst
+Database file #1: selfPacedLVM.bib
+You've used 25 entries,
+            2118 wiz_defined-function locations,
+            620 strings with 7002 characters,
+and the built_in function-call counts, 7577 in all, are:
+= -- 665
+> -- 430
+< -- 0
++ -- 169
+- -- 142
+* -- 482
+:= -- 1310
+add.period$ -- 75
+call.type$ -- 25
+change.case$ -- 143
+chr.to.int$ -- 0
+cite$ -- 25
+duplicate$ -- 314
+empty$ -- 637
+format.name$ -- 142
+if$ -- 1574
+int.to.chr$ -- 0
+int.to.str$ -- 25
+missing$ -- 28
+newline$ -- 128
+num.names$ -- 50
+pop$ -- 194
+preamble$ -- 1
+purify$ -- 121
+quote$ -- 0
+skip$ -- 184
+stack$ -- 0
+substring$ -- 238
+swap$ -- 38
+text.length$ -- 0
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 94
+warning$ -- 0
+while$ -- 56
+width$ -- 27
+write$ -- 260
