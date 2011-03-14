@@ -116,7 +116,7 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
         for t = 1:numel(typeRange),
             ex = example{t};
             
-            switch typeNames{t};
+            switch typeNames{typeRange(t)};
               case 'CCCP'
                 criteria = zeros(size(latent{t}));
               case 'SPL'
@@ -150,7 +150,7 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
                 end
                 orderplot = figure;
                 figure(orderplot);
-                scatter(spot{i}, spot{j}, 2);
+                scatter(spot{i}, spot{j}, 4);
                 title('Scatterplot of orders');
                 xlabel(['When point was added by ' typeNames{typeRange(i)} ' criteria']);
                 ylabel(['When point was added by ' typeNames{typeRange(j)} ' criteria']);
@@ -160,7 +160,7 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
 end
 
 
-function [order, spot] = ComputeOrder(examples, criteria)
+function [order, spot, round_samples] = ComputeOrder(examples, criteria)
 % Compute the order in which each sample was first added
 %  examples - num_iters x num_samples, boolean of whether sample was included in each iteration
 %  critera - selection criteria (smaller = more likely to select) for ordering within interations
@@ -171,8 +171,8 @@ function [order, spot] = ComputeOrder(examples, criteria)
     num_iters = size(examples, 1);
     num_samples = size(examples, 2);
     
-    order = 1:num_samples;
-    spot = 1:num_samples;
+    order = -1000 * ones(1, num_samples);
+    spot = -1000*ones(1, num_samples);
     pts_added = 0;
 
     % Find when each point is first included
