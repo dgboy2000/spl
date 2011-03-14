@@ -80,23 +80,28 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
     if showIters,
         for t = 1:numel(typeRange),
             type = typeRange(t);
+            
             relSlack = slack{t};
             relEntropy = entropy{t};
+            
             nIt = numIters(t);
             nRows = ceil(nIt/5);
             nCols = 5;
+            
             hslack = figure;
             hent = figure;
+            
             for i = 1:nIt,
                 curSlacks = relSlack(i,1:2500);
-                curEntropies = relEntropy(i,1:2500);
                 [sortedSlacks indices] = sort(curSlacks);
                 figure(hslack);
                 subplot(nRows,nCols,i);
                 bar(sortedSlacks);
                 axis([0 length(sortedSlacks) -1 10]);
+
                 figure(hent);
                 subplot(nRows,nCols,i);
+                curEntropies = relEntropy(i,1:2500);
                 bar(curEntropies(indices));
                 axis([0 length(sortedSlacks) 0 10]);
             end
@@ -106,11 +111,11 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
     
     if getOrder,
         order = cell(1,numel(typeRange)); % One cell per order vector of entries added for the corresponding algorithm
+        spot = cell(1,numel(typeRange)); % Vector: i-th entry is when the i-th point was added
+        % {'CCCP','SPL','Uncertainty-Slack','Uncertainty'}
         for t = 1:numel(typeRange),
             ex = examples{t};
-            ord = zeros(1, size(examples))
             
-            % {'CCCP','SPL','Uncertainty-Slack','Uncertainty'}
             switch typeNames{t};
               case 'CCCP'
                 criteria = zeros(size(latent{t}));
@@ -136,19 +141,32 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
             
             order{t} = ComputeOrder(ex, criteria);
         end
+        
+        i = 2;
+        j = 4;
+        orderplot = figure;
+        figure(orderplot);
+        plot(spot{i}, spot{j});
+        title('Scatterplot of orders');
+        xlabel('When point was added by ' typeNames{i} ' criteria');
+        xlabel('When point was added by ' typeNames{j} ' criteria');
     end
 end
 
 
-function order = ComputeOrder(examples, criteria)
+function [order, spot] = ComputeOrder(examples, criteria)
 % Compute the order in which each sample was first added
 %  examples - num_iters x num_samples, boolean of whether sample was included in each iteration
 %  critera - selection criteria (smaller = more likely to select) for ordering within interations
+%
+% Order is a vector of the order in which points are added
+% Spot is a vector of, for each point, when it is added
   
     num_iters = size(examples, 1);
     num_samples = size(examples, 2);
     
     order = 1:num_samples;
+    spot = 1:num_samples;
     pts_added = 0;
 
     % Find when each point is first included
@@ -171,6 +189,7 @@ function order = ComputeOrder(examples, criteria)
         for j = round_order,
             pts_added = pts_added + 1;
             order[pts_added] = round_samples[j];
+            spot[round_samples[j]] = pts_added;
         end
     end
     
