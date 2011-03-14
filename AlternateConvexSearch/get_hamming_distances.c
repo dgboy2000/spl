@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
 
   long i,j,sum,count;
 
-  if(argc < 3) {
+  if(argc < 4) {
     printf("Not enough input arguments!\n");
     exit(0);
   }
@@ -28,6 +28,8 @@ int main(int argc, char* argv[]) {
   
   char filestub[1024];
   strcpy(filestub, argv[2]);
+
+  int reduced_size = atoi(argv[3]);
 
   char latentFN[1024];
   char exampleFN[1024];
@@ -51,6 +53,7 @@ int main(int argc, char* argv[]) {
   
   STRUCT_LEARN_PARM sparm;
   sparm.motif_length = MOTIF_LEN;
+  sparm.reduced_size = reduced_size;
 	SAMPLE alldata = read_struct_examples(dataFN,&sparm);
   int charCounts[4*MOTIF_LEN];
   
@@ -98,15 +101,19 @@ int main(int argc, char* argv[]) {
       if(valid_examples[i] && alldata.examples[i].y.label == 1) {
         for(j=0;j<MOTIF_LEN;j++) {
           ch = alldata.examples[i].x.sequence[hidden_pos[i]+j]; 
+          //printf("%c",ch);
           if(ch == CH0) charCounts[4*j]++;
           if(ch == CH1) charCounts[4*j+1]++;
           if(ch == CH2) charCounts[4*j+2]++;
           if(ch == CH3) charCounts[4*j+3]++;
         }
+        //printf("\n");
         count++;
       }
     }  
 
+    //for(i=0;i<4*MOTIF_LEN;i++) printf("%d ",charCounts[i]); 
+    //printf("\n");
     sum = 0;
     for(j=0;j<MOTIF_LEN;j++) {
       sum+=charCounts[4*j]*(charCounts[4*j+1]+charCounts[4*j+2]+charCounts[4*j+3]);
