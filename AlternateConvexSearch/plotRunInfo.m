@@ -143,14 +143,19 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
             order{t};
         end
         
-        i = 2;
-        j = 4;
-%         orderplot = figure;
-%         figure(orderplot);
-%         plot(spot{i}, spot{j});
-%         title('Scatterplot of orders');
-%         xlabel(['When point was added by ' typeNames{i} ' criteria']);
-%         ylabel(['When point was added by ' typeNames{j} ' criteria']);
+        for i = 1:numel(typeRange),
+            for j = 1:numel(typeRange),
+                if (j <= i)
+                    continue
+                end
+                orderplot = figure;
+                figure(orderplot);
+                scatter(spot{i}, spot{j}, 2);
+                title('Scatterplot of orders');
+                xlabel(['When point was added by ' typeNames{typeRange(i)} ' criteria']);
+                ylabel(['When point was added by ' typeNames{typeRange(j)} ' criteria']);
+            end
+        end
     end
 end
 
@@ -176,9 +181,11 @@ function [order, spot] = ComputeOrder(examples, criteria)
         first_rounds(j) = find(examples(:,j), 1);
     end
     
+    display('starting ComputeOrder')
     for i = 1:num_iters,
         % Find the points first included in this iteration
         round_samples = find(first_rounds == i);
+        length(round_samples)
         if (length(round_samples) == 0),
             continue
         end
