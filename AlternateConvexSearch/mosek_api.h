@@ -25,3 +25,13 @@ double compute_delta_w (double *w /* Vector of feature weights */,
 void print_mosek_stats (); /* Print statistics on the mosek runs. */
 
 void test_mosek();
+
+
+void print_int_vec (int *vec, int size);
+void print_double_vec (double *vec, int size);
+
+double *vector_diff (double *a, double *b, int n);
+double *vector_sum (double *a, double *b, int n);
+
+/* Computes vector difference a-b, a vector of size n */
+double dot_product (double *a, double *b, int n);
