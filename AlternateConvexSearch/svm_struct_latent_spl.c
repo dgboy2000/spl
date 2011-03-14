@@ -840,7 +840,7 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
       // printf ("Features: \n"); print_double_vec (sm->w, sm->sizePsi);
       // printf ("phi star: \n"); print_double_vec (convert_from_svector (fy, sm->sizePsi), num_features);
       // printf ("phi hat: \n"); print_double_vec (convert_from_svector (fybar, sm->sizePsi), sm->sizePsi);
-      printf("*"); fflush(stdout);
+      // printf("*"); fflush(stdout);
       novelty = get_novelty(ex,i,sm,sparm);
 
     } else {
@@ -877,7 +877,6 @@ int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPL
 	}
 
 	sortStruct *exampleScores = get_example_scores(m, C, fycache, ex, sm, sparm, losses, slacks, entropies, novelties);
-  printf("\n");
 
   double penalty = 1.0/spl_weight;
 	if(penalty < 0.0)
@@ -907,18 +906,19 @@ double get_init_spl_weight(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
   printf("\n");  
 
   long i;
-  int half, halfPos, numPos;
+  int half, totalPos, numPos;
   double uncertaintyWeight = sparm->uncertainty_weight;
+  double noveltyWeight = sparm->novelty_weight;
 
 	half = (int) round(sparm->init_valid_fraction*m);
 	double init_spl_weight = (double)m/C/exampleScores[half].val;
 
-  if(uncertaintyWeight && sparm->n_classes == 2) { //only want this in motif
-    halfPos = (int) round(sparm->init_valid_fraction*m/2); //half of positive examples
+  if(sparm->init_valid_fraction_pos) { 
+    totalPos = (int) round(sparm->init_valid_fraction_pos*m/2); //fraction of positive examples
     numPos = 0;
     for(i=0;i<m;i++) {
       if(ex[exampleScores[i].index].y.label == 1) numPos++;
-      if(numPos >= halfPos) { 
+      if(numPos >= totalPos) { 
         init_spl_weight = (double)m/C/exampleScores[i].val;
         break;
       }
@@ -1363,6 +1363,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
   struct_parm->novelty_weight = 0.0;
   struct_parm->print_extensive = 0;
   struct_parm->reduced_size = 0;
+  struct_parm->init_valid_fraction_pos = 0.0;
 
   struct_parm->custom_argc=0;
 
@@ -1381,6 +1382,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
 		case 'm': i++; *spl_factor = atof(argv[i]); break;
 		case 'o': i++; struct_parm->optimizer_type = atoi(argv[i]); break;
 		case 'f': i++; struct_parm->init_valid_fraction = atof(argv[i]); break;
+    case 'y': i++; struct_parm->init_valid_fraction_pos = atof(argv[i]); break;
     case 'u': i++; struct_parm->uncertainty_weight = atof(argv[i]); break;
     case 'v': i++; struct_parm->novelty_weight = atof(argv[i]); break;
     case 'x': i++; struct_parm->print_extensive = atoi(argv[i]); break;

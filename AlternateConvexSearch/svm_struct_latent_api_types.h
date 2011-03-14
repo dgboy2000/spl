@@ -96,6 +96,7 @@ typedef struct struct_learn_parm {
 	int rng_seed;
 	int optimizer_type;
 	double init_valid_fraction;
+  double init_valid_fraction_pos;
   double uncertainty_weight;
   double novelty_weight;
   int print_extensive;

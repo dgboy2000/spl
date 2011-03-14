@@ -9,7 +9,7 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
     %prots = {'052','074','108','131','146'};
     types = {'','_spl','_newHalf','_newAll','_novelty'};
     typeNames = {'CCCP','SPL','Uncertainty-Slack','Uncertainty'};
-    resultDir = 'results';
+    resultDir = 'results2';
 
     %prot = 4;
     %type = 1;
@@ -140,16 +140,17 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
             ex = ex(:, 1:(num_samples/2));
             
             order{t} = ComputeOrder(ex, criteria);
-        end
         
-        i = 2;
-        j = 4;
-        orderplot = figure;
-        figure(orderplot);
-        plot(spot{i}, spot{j});
-        title('Scatterplot of orders');
-        xlabel('When point was added by ' typeNames{i} ' criteria');
-        xlabel('When point was added by ' typeNames{j} ' criteria');
+        
+            i = 2;
+            j = 4;
+            orderplot = figure;
+            figure(orderplot);
+            plot(spot{i}, spot{j});
+            title('Scatterplot of orders');
+            xlabel('When point was added by ' typeNames{i} ' criteria');
+            xlabel('When point was added by ' typeNames{j} ' criteria');
+        end
     end
 end
 
