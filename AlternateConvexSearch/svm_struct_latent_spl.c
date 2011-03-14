@@ -818,11 +818,11 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
     if(noveltyWeight || sparm->print_extensive) {
       // novelty = 0.0; //CHANGE THIS WHEN THE NOVELTY CODE IS READY!!!!!
       // printf ("Slack %d: %f from label %d, position %d, numPositions %d, true label %d,\n", (int)i, difficulty, ybar.label, hbar.position, numPositions, ex[i].y.label);
-      LABEL y;
-      LATENT_VAR h;
-      y.label = -1;
-      h.position = -1;
-      int num_features =  sm->sizePsi;
+      //LABEL y;
+      //LATENT_VAR h;
+      //y.label = -1;
+      //h.position = -1;
+      //int num_features =  sm->sizePsi;
       // SVECTOR *psi_minus_one = psi (ex[i].x, y, h, sm, sparm);
       // 
       // printf ("w \\cdot phi_minus_one: %f\n", dot_product (sm->w, convert_from_svector (psi_minus_one, num_features), num_features));

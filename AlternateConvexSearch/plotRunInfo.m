@@ -101,8 +101,8 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
                 axis([0 length(sortedSlacks) 0 10]);
             end
         end
-
     end
+    
     
     if getOrder,
         order = cell(1,numel(typeRange)); % One cell per order vector of entries added for the corresponding algorithm
