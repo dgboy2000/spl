@@ -107,7 +107,7 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
     if getOrder,
         order = cell(1,numel(typeRange)); % One cell per order vector of entries added for the corresponding algorithm
         for t = 1:numel(typeRange),
-            ex = examples{t};
+            ex = example{t};
             ord = zeros(1, size(examples))
             
             % {'CCCP','SPL','Uncertainty-Slack','Uncertainty'}
@@ -131,8 +131,8 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
             % Take only the first half of the samples with correct label 1
             % This is necessary for the entropy, and therefore also
             % for comparing other things to the entropy
-            criteria = criteria[:, 1:(num_samples/2)];
-            ex = ex[:, 1:(num_samples/2)];
+            criteria = criteria(:, 1:(num_samples/2));
+            ex = ex(:, 1:(num_samples/2));
             
             order{t} = ComputeOrder(ex, criteria);
         end
@@ -154,7 +154,7 @@ function order = ComputeOrder(examples, criteria)
     % Find when each point is first included
     first_rounds = zeros(1, num_samples);
     for j = 1:num_samples,
-        first_rounds[j] = find(examples[:,j], 1);
+        first_rounds(j) = find(examples(:,j), 1);
     end
     
     for i = 1:num_iters,
@@ -165,12 +165,12 @@ function order = ComputeOrder(examples, criteria)
         end
         
         % Find the permutation of round_samples that orders them by criteria (ascending)
-        round_criteria = criteria[i, round_samples];
+        round_criteria = criteria(i, round_samples);
         [tmp,round_order] = sort(round_criteria);
         
         for j = round_order,
             pts_added = pts_added + 1;
-            order[pts_added] = round_samples[j];
+            order(pts_added) = round_samples(j);
         end
     end
     
