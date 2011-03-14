@@ -116,7 +116,7 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
         for t = 1:numel(typeRange),
             ex = example{t};
             
-            switch typeNames{t};
+            switch typeNames{typeRange(t)};
               case 'CCCP'
                 criteria = zeros(size(latent{t}));
               case 'SPL'
@@ -139,23 +139,29 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
             criteria = criteria(:, 1:(num_samples/2));
             ex = ex(:, 1:(num_samples/2));
             
-            order{t} = ComputeOrder(ex, criteria);
+
+            [order{t} spot{t}] = ComputeOrder(ex, criteria);
+            order{t};
+        end
         
-        
-            i = 2;
-            j = 4;
-            orderplot = figure;
-            figure(orderplot);
-            plot(spot{i}, spot{j});
-            title('Scatterplot of orders');
-            xlabel('When point was added by ' typeNames{i} ' criteria');
-            xlabel('When point was added by ' typeNames{j} ' criteria');
+        for i = 1:numel(typeRange),
+            for j = 1:numel(typeRange),
+                if (j <= i)
+                    continue
+                end
+                orderplot = figure;
+                figure(orderplot);
+                scatter(spot{i}, spot{j}, 4);
+                title('Scatterplot of orders');
+                xlabel(['When point was added by ' typeNames{typeRange(i)} ' criteria']);
+                ylabel(['When point was added by ' typeNames{typeRange(j)} ' criteria']);
+            end
         end
     end
 end
 
 
-function [order, spot] = ComputeOrder(examples, criteria)
+function [order, spot, round_samples] = ComputeOrder(examples, criteria)
 % Compute the order in which each sample was first added
 %  examples - num_iters x num_samples, boolean of whether sample was included in each iteration
 %  critera - selection criteria (smaller = more likely to select) for ordering within interations
@@ -166,8 +172,8 @@ function [order, spot] = ComputeOrder(examples, criteria)
     num_iters = size(examples, 1);
     num_samples = size(examples, 2);
     
-    order = 1:num_samples;
-    spot = 1:num_samples;
+    order = -1000 * ones(1, num_samples);
+    spot = -1000*ones(1, num_samples);
     pts_added = 0;
 
     % Find when each point is first included
@@ -176,9 +182,11 @@ function [order, spot] = ComputeOrder(examples, criteria)
         first_rounds(j) = find(examples(:,j), 1);
     end
     
+    display('starting ComputeOrder')
     for i = 1:num_iters,
         % Find the points first included in this iteration
         round_samples = find(first_rounds == i);
+        length(round_samples)
         if (length(round_samples) == 0),
             continue
         end
