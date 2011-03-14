@@ -139,17 +139,18 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
             criteria = criteria(:, 1:(num_samples/2));
             ex = ex(:, 1:(num_samples/2));
             
-            order{t} = ComputeOrder(ex, criteria);
+            [order{t} spot{t}] = ComputeOrder(ex, criteria);
+            order{t};
         end
         
         i = 2;
         j = 4;
-        orderplot = figure;
-        figure(orderplot);
-        plot(spot{i}, spot{j});
-        title('Scatterplot of orders');
-        xlabel('When point was added by ' typeNames{i} ' criteria');
-        xlabel('When point was added by ' typeNames{j} ' criteria');
+%         orderplot = figure;
+%         figure(orderplot);
+%         plot(spot{i}, spot{j});
+%         title('Scatterplot of orders');
+%         xlabel(['When point was added by ' typeNames{i} ' criteria']);
+%         ylabel(['When point was added by ' typeNames{j} ' criteria']);
     end
 end
 
