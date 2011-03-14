@@ -9,7 +9,7 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
     %prots = {'052','074','108','131','146'};
     types = {'','_spl','_newHalf','_newAll','_novelty'};
     typeNames = {'CCCP','SPL','Uncertainty-Slack','Uncertainty'};
-    resultDir = 'results';
+    resultDir = 'resultsOld';
 
     %prot = 4;
     %type = 1;
@@ -24,7 +24,9 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
     slack = cell(1,numel(typeRange)); % all slacks
     entropy = cell(1,numel(typeRange)); % entropy
     novelty = cell(1,numel(typeRange)); %
+    loss = cell(1,numel(typeRange));
     obj = cell(1,numel(typeRange));
+    time = cell(1,numel(typeRange));
     numIters = zeros(1,numel(typeRange));
     numEx = 0;
     
@@ -40,6 +42,7 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
         slackLoc = [str '.slack'];
         entropyLoc = [str '.entropy'];
         noveltyLoc = [str '.novelty'];
+        lossLoc = [str '.loss'];
 
         latent{t} = load(latentLoc);
         example{t} = load(exampleLoc);
@@ -47,8 +50,10 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
         slack{t} = load(slackLoc);
         entropy{t} = load(entropyLoc);
         novelty{t} = load(noveltyLoc);
+        loss{t} = load(lossLoc);
         objAndTime = load(objAndTimeLoc);
         obj{t} = objAndTime(:,1);
+        time{t} = objAndTime(:,2);
 
         numIters(t) = size(example{t},1);
         numEx = size(example{t},2);
@@ -120,11 +125,13 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
               case 'CCCP'
                 criteria = zeros(size(latent{t}));
               case 'SPL'
-                criteria = slack{t};
+                criteria = loss{t}+slack{t};
               case 'Uncertainty-Slack'
                 criteria = (slack{t} + entropy{t}) / 2;
               case 'Uncertainty'
-                criteria = entropy{t};
+                criteria = loss{t}+entropy{t};
+              case 'Novelty'
+                criteria = novelty{t};   
               otherwise
                 display('Bad typename '+typeNames{t});
                 a = 1 / 0;

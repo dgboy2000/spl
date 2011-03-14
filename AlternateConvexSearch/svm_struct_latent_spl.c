@@ -696,6 +696,7 @@ double *convert_from_svector(SVECTOR *svec,int size) {
 }
 
 double get_novelty(EXAMPLE *ex, long exNum, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+  printf("*"); fflush(stdout);
   int numPairs;  
   long j;
 
