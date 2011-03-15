@@ -5,8 +5,8 @@
 \usepackage{epsfig}
 \usepackage{wrapfig}
 \usepackage[numbers]{natbib}
-\usepackage{algorithm}
-\usepackage{algorithmic}
+\usepackage{final/algorithm}
+\usepackage{final/algorithmic}
 \usepackage{url}
 
 \renewcommand{\baselinestretch}{.99}
@@ -87,7 +87,7 @@ Stanford University \\
 
 \mysection{Introduction}
 \label{sec:introduction}
-Structural Support Vector Machines (SSVMs) are a well-known classification model that performs well on complex datasets where the form of the feature vector depends on the chosen label \cite{SSVM}.  Introducing a latent variable $\bf h$ further increases the power of the model.  SSVMs with latent variables achieve good results on motif finding in protein sequences, natural language processing, handwriting recognition, object detection, and other varied problems \cite{SPL}.  Improvements in learning this model therefore will have benefits for many applications.
+Structural Support Vector Machines (SSVMs) are a type of discriminative classification model that performs well on complex datasets where the form of the feature vector depends on the chosen label \cite{SSVM}.  Introducing a latent variable $\bf h$ further increases the power of the model.  SSVMs with latent variables achieve good results on motif finding in protein sequences, natural language processing, handwriting recognition, object detection, and other varied problems \cite{SPL,App1}.  Improvements in learning this model therefore will have benefits for many applications.
 
 The latent SSVM learning problem is the following\cite{SPL}:
 
@@ -100,7 +100,7 @@ The latent SSVM learning problem is the following\cite{SPL}:
 &&\forall \hat{\bf y}_i \in {\cal Y}, \forall \hat{h}_i \in {\cal H}, i=1,\cdots,n.
 \end{eqnarray}
 
-where $r(\cdot)$ is the SSVM regularization penalty and TODO: can we use the same formulation now that the criteria are different?  Intuitively, $\bf w$ is a parameter vector that represents how a correctly-labeled feature vector ought to look.  For a given $\bf x$, the predicted $(\bf y,\bf h)$ is the pair that maximizes $\bf{{w}} ^T \Phi(\bf x,\bf y,\bf h)$.  $\xi_i$ is the usual slack variable 
+Intuitively, $\bf w$ is a parameter vector that represents how a correctly-labeled feature vector ought to look.  For a given $\bf x$, the predicted $(\bf y,\bf h)$ is the pair that maximizes $\bf{{w}} ^\top \Phi(\bf x,\bf y,\bf h)$.  $\xi_i$ is the usual slack variable 
 and $\Delta(\bf y,\hat{\bf y})=1-I(\bf y=\hat{\bf y})$ is the binary loss function. TODO: is this loss right?
 
 The learning problem is non-convex and suffers from many bad local optima of the parameters $\bf w$.  One approach to overcoming this challenge is Self-Paced Learning (SPL), in which the features are first trained on an `easy' subset of the data, which is gradually expanded to include the entire training corpus\cite{SPL}.  This is based on the human intuition that people learn best starting with an easy example, which we understand clearly, and then generalizing to harder examples.  An iteration of SPL involves choosing a `easiness' $K$ and solving
@@ -112,6 +112,8 @@ The learning problem is non-convex and suffers from many bad local optima of the
 \label{eq:selfPacedMIP}
 \end{equation}
 
+
+where $r(\cdot)$ is the SSVM regularization penalty and TODO: can we use the same formulation now that the criteria are different?  
 Intuitively, the $\bf v$ are selectors for samples are learned, and will choose all samples $i$ with `difficulty' $f({\bf x}_i,{\bf y}_i; {\bf w})$ less than $\frac{1}{K}$. We have 2 (non-exclusive) rationales for how this might help in latent SSVM:
 
 \begin{enumerate}
@@ -119,23 +121,95 @@ Intuitively, the $\bf v$ are selectors for samples are learned, and will choose 
 \item \textbf{Asymmetric Performance}.  The phrase `jack of all trades' implies `master of none'.  It is possible that, when training on all data $\bf w$ gets stuck in a regime that is mediocre across all the data, while a regime that does really well on a subset of the data and worse on the rest could achieve better performance.  Training on easy data first can guide the parameters towards such asymmetric optima.
 \end{enumerate}
 
-We explore 2 novel criteria for `easiness' of a sample, one motivated by each intuition:
+We explore 2 novel criteria for `easiness' of a sample, one motivated by each above intuition.
 
-\section{Related Work}
-SPL was proposed by Kumar et al \cite{SPL} as an improved way to solve the following SSVM problem:
+\mysection{Related Work}
+\label{sec:related}
+SPL was recently proposed by Kumar et al.  They use the slack variable $\xi_i$ as a measure of the difficulty of a sample.  Slack is a natural criterion because $\xi_i=0$ indicates a correctly classified sample and larger $\xi_i$ indicates greater distance (in feature space) from the correct classification boundary.  Kumar et al. show approximately 1\% improvement in training objective, training error, and test error across four different applications from vision, language, and biology\cite{SPL}.
+
+Slack, however, is at least partially independent of whether we have learned the correct hidden variable.  If we learn an incorrect parameter vector that predicts incorrect hidden variables, we will keep including points with low slack but possibly-incorrect hidden variables.  Therefore, we choose a criterion that should encourage better hidden variable selection.
+
+\mysection{Extension}
+\label{sec:Extension}
+Hidden variables and other abstractions are used because they are \emph{useful}: them allow a simpler model of complex dynamics.  We choose a criterion called \textbf{Uncertainty} that marks examples as `easy' when we are certain of their hidden variables:
+
+\begin{eqnarray}
+u_i &=& \sum_{\bf\hat{h}} \bf\tilde p({\hat h}) \log\bf\tilde p(\bf{\hat h}), \nonumber \\
+\bf{\tilde{p}(\hat h)} &=&\frac{\sigma(\bf{w}^\top\Phi(\bf x,y,\hat h))}{\sum_{h}\sigma(\bf w^\top\Phi(\bf x,\bf y,\bf h))}, \nonumber \\
+\sigma(\bf x) &=& \frac{1}{1+\exp(k\bf x)}
+\label{eq:uncertainty}
+\end{eqnarray}
+TODO: do we choose only the correct y in the above situations?
+
+If we interpret the sigmoid of the score of hidden variable $\bf \hat h$ as a probability, $\bf\tilde p(\bf \hat h)$, then $u_i$ has a natural interpretation as the entropy of the motif location.  We hypothesize that training first on examples on which we are confident of the hidden variable will encode a better hidden variable model in the parameters $\bf w$.
+
+Our second iteration is that we should train on examples in the order in which they are easiest to \emph{learn}.  The slack $\xi_i$ represents the extent to which a point violates our current \emph{knowledge}.  Even if $\xi_i$ is big, it may be possible to make a small change to $\bf w$ to \emph{learn} this point and send $\xi$ to zero.  With this intuition, we define the \textbf{Novelty} of an example $(\bf x, \bf y)$ to a parameter vector $\bf w$ as follows:
+
+\begin{eqnarray}
+\textbf{Novelty}&=&\min_{\Delta w} \frac{1}{2}||{\Delta\bf w}||^2, \nonumber \\
+\mbox{s.t. } && \max_{h \in {\cal H}} \left( {\bf w}^\top + \Delta\bf w \right) \left(\Phi({\bf x},{\bf y},{\bf h}) - 
+		\Phi({\bf x},\hat{\bf y},\hat{\bf h}) \right)
+	 \geq \Delta({\bf y},\hat{\bf y}) , \nonumber \\
+\label{eq:novelty}
+&&\forall \hat{\bf y} \in {\cal Y}, \forall \hat{h} \in {\cal H}, i=1,\cdots,n.
+\end{eqnarray}
+
+Intuitively, $\Delta w$ is the smallest change we have to make to $\bf w$ in order to correctly classify $x$.  
 
 
+\mysection{Implementation}
+\label{sec:Implementation}
+We chose to test our criteria on the problem of identifying motifs in protein sequences.  This problem has been studied for both latent SSVM \cite{SSVM} and SPL \cite{SPL}, so it was a natural starting point to evaluate new criteria.
 
+We modified the SPL code from \cite{SPL} to simulate our new objectives. The existing code solved the SPL problem using an outer loop for hidden variable computation and an inner loop for parameter updates and sample inclusion.
 
-In SPL, each point is given a 
+\begin{algorithm}[h!]
+\mytopcaption{Outer Loop: The self-paced learning algorithm for parameter estimation of latent {\sc ssvm}.}
+\label{algo:selfPacedLatentSSVM}
+\begin{algorithmic}[1]
+\INPUT ${\cal D} = \{({\bf x}_1,{\bf y}_1),\cdots,({\bf x}_n,{\bf y}_n)\}$, ${\bf w}_0$, $K_0$, $\epsilon$.
+\STATE $t \leftarrow 0$, $K \leftarrow K_0$.
+\REPEAT
+\STATE Update $h_i^* = \argmax_{h_i \in {\cal H}} {\bf w}_{t}^\top \Phi({\bf x}_i,{\bf y}_i,{\bf h}_i)$.
+\STATE Update ${\bf w}_{t+1}$ by using {\sc acs} to minimize the objective
+$\frac{1}{2}||{\bf w}||^2 + \frac{C}{n} \sum_{i=1}^n v_i\xi_i - \frac{1}{K} \sum_{i=1}^n v_i$ subject to the
+constraints of problem~(\ref{eq:latentSSVM}) as
+well as ${\bf v} \in \{0,1\}^n$.
+\STATE $t \leftarrow t + 1$, $K \leftarrow K/\mu$.
+\UNTIL{$v_i = 1, \forall i$ and the objective function cannot be decreased below tolerance $\epsilon$.}
+\end{algorithmic}
+\end{algorithm}
 
-Latent Variable Graphical Models (call them LVGMs) are a popular tool for learning and inference in varied applications like object detection \cite{2} and genome pathway identification \cite{1}.  LVGMs simultaneously learn a graph's structure and parameters, the exact solution of which is an NP-hard non-convex optimization problem.  A frequent difficulty occurs when an LVGM gets stuck in a bad local extremum.  Therefore, LVGMs are usually run with many different random initial conditions.  Self-Paced Learning (SPL) anneals learning so that only `easy' data points are learned at first, and more data is gradually included \cite{SPL}.  The goal is to nurse a LVGM around bad local optima by keeping it close to a growing set of well-explained training data.  The technique has improved a little on learning of latent SSVMs \cite{SPL}, and has not yet been applied to LVGMs.
+The outer loop alternates between choosing the best hidden variable for each example and optimizing the parameters and selected examples, a process called Alternate Convex Search (ACS).  Each successive iteration through the outer loop lowers the easiness barrier for including samples, until all samples are included. TODO: what is the right optimization for SPL with other criteria?
 
-For this project, use the ideas in \cite{SPL}, the textbook, and \cite{Murphy} to write down a SPL algorithm for LVGMs.  Apply this algorithm to a problem where LVGMs are known to work.  If you wish to be ambitious, use a Dynamic Bayesian Network where the transition model has latent variables.  Compare the performance of SPL against a traditional learning algorithm.  For example, compare the test error, training time, and objective function.  Note the propensity of each method to find inferior local optima and speculate on reasons why / possible improvements.
+The parameter-estimation-and-sample-inclusion step is executed by an inner loop that alternates between selecting the currently active samples and updating the parameters accordingly.  The actually latent SSVM is solved using the {\sc CCCP} algorithm \cite{SSVM}, which also alternates between finding the most violated constraint
+\mthb
+{\bf\hat y_i,\bf\hat h_i} = \argmax_{{\bf\hat y_i},{\bf\hat h_i}} \Delta(\bf y_i,\bf\hat y_i)+\bf w^\top\Phi(\bf x_i,\bf\hat y_i,\bf\hat h_i)
+\mthe
+and optimizing the parameters $\bf w$ given that constraint.  We did not modify this code and refer the reader to \cite{SSVM} for details.
 
-Some papers with application ideas are in the bibliography.
+\begin{algorithm}[h!]
+\mytopcaption{Inner Loop: Parameter estimation and example inclusion in \sc{SPL}.}
+\label{algo:latentSSVM}
+\begin{algorithmic}[1]
+\INPUT ${\cal D} = \{({\bf x}_1,{\bf y}_1),\cdots,({\bf x}_n,{\bf y}_n)\}$, ${\bf w}_0$, $\epsilon$, $h_i^*$.
+\STATE $t \leftarrow 0$
+\REPEAT
+\STATE Update $v_i = 1$ if $f(\bf x_i, \bf y_i;\bf w_t) < \frac{1}{K}$, $v_i=0$ otherwise.  Recall that $f()$ is the `difficulty' of a sample, either its uncertainty~(\ref{eq:uncertainty}) or novelty~(\ref{eq:novelty}) in this work, or the slack variable in \cite{SPL}.
+\STATE Update ${\bf w}_{t+1}$ by solving the corresponding
+{\sc ssvm} problem over the samples with $v_i=1$. Specifically, \\
+${\bf w}_{t+1} = \argmin_{\bf w} \frac{1}{2}||{\bf w}||^2 + \frac{C}{n}\sum_{i} v_i\max\{0,\Delta({\bf y}_i,\hat{\bf y}_i) +
+		{\bf w}^\top (\Phi({\bf x}_i,\hat{\bf y}_i,\hat{\bf h}_i) - \Phi({\bf x}_i,{\bf y}_i,{\bf h}_i^*))\}$.
+\STATE $t \leftarrow t + 1$.
+\UNTIL{Objective function cannot be decreased below tolerance $\epsilon$.}
+\end{algorithmic}
+\end{algorithm}
 
+TODO: what is the stopping condition for this algorithm?
 
+Computing the uncertainty of a sample~\ref{eq:uncertainty} involves a simple loop over all possible hidden variable positions to compute $\sigma$.  The resulting $\sigma$ vector is normalized and its entropy is computed.  One practical difficulty in the motif data is that `negative examples' -- those with $y=-1$, who do not contain the motif -- have only one possible hidden variable position $h=-1$, and therefore uncertainty 0.  This means that all negative samples will be included before any positive samples are included.  We are careful to set our initial parameter $K$ so that at least 10\% of the positive examples are included as well.
+
+Computing the novelty is more complicated as it involves solving a Quadratic Program~(\ref{eq:novelty}) for each sample.  We wrote our own interface {\sc mosek\_api.c} to the MOSEK optimization suite \cite{Mosek} to solve this problem.  We verified the implementation of our interface on a simple problem with known analytical solution with {\sc ./TEST\_MOSEK}.  The computational complexity of this problem slows the computation considerably compared to other SPL selection criteria.
 
 \begin{thebibliography}{9}
 
@@ -145,6 +219,9 @@ NIPS 2010. \url{http://ai.stanford.edu/~koller/Papers/Kumar+al:NIPS10.pdf}
 
 \bibitem{SSVM} CN Yu, T Joachims. \emph{Learning Structural SVMs with Latent Variables}. \url{www.cs.cornell.edu/~cnyu/papers/icml09_latentssvm.pdf}
 
+\bibitem{App1} PF Felzenszwalb, RB Girshick, D McAllester and D Ramanan. \emph{Object Detection with Discriminatively TrainedPart Based Models}.  \url{http://www.ics.uci.edu/~dramanan/papers/latentmix.pdf}
+
+\bibitem{Mosek} The MOSEK Optimization Software. \url{http://www.mosek.com/}
 
 \end{thebibliography}
 
