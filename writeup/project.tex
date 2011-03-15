@@ -1,0 +1,151 @@
+\documentclass{article}
+\usepackage{styleFiles/nips10submit_e,times}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{epsfig}
+\usepackage{wrapfig}
+\usepackage[numbers]{natbib}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{url}
+
+\renewcommand{\baselinestretch}{.99}
+  
+\newcommand{\comment}[1]{}
+\newcommand{\mysection}[1]{\vspace{-4mm}\section{#1}\vspace{-4mm}}
+\newcommand{\mysubsection}[1]{\vspace{-3mm}\subsection{#1}\vspace{-3mm}}
+\newcommand{\myparagraph}[1]{\vspace{-2mm}\paragraph{#1}}
+\newcommand{\mycaption}[1]{\vspace{-3mm}\caption{\em \footnotesize #1}\vspace{-3mm}}
+\newcommand{\mytopcaption}[1]{\caption{\em \footnotesize #1}}
+\newcommand{\theHalgorithm}{\arabic{algorithm}}
+\newcommand{\twofigures}[5]{
+\renewcommand{\citename}{\citet}
+\begin{minipage}[t]{0.49\textwidth}
+\centerline{\psfig{figure=#1,height=#3}}
+\end{minipage}\hspace{0.01\textwidth}
+\begin{minipage}[t]{0.49\textwidth}
+\centerline{\psfig{figure=#2,height=#3}}
+\end{minipage}
+\raisebox{0mm}
+{\makebox[0.5\textwidth][c]{(#4)}\makebox[0.5\textwidth][c]{(#5)}}
+}
+\newcommand{\threefigures}[4]{
+\begin{minipage}[t]{0.32\textwidth}
+\centerline{\psfig{figure=#1,height=#4}}
+\end{minipage}\hspace{0.01\textwidth}
+\begin{minipage}[t]{0.32\textwidth}
+\centerline{\psfig{figure=#2,height=#4}}
+\end{minipage}\hspace{0.01\textwidth}
+\begin{minipage}[t]{0.32\textwidth}
+\centerline{\psfig{figure=#3,height=#4}}
+\end{minipage}
+}
+\newcommand{\threefigurescaps}[7]{
+\begin{minipage}[t]{0.32\textwidth}
+\centerline{\psfig{figure=#1,height=#4}}
+\end{minipage}\hspace{0.01\textwidth}
+\begin{minipage}[t]{0.32\textwidth}
+\centerline{\psfig{figure=#2,height=#4}}
+\end{minipage}\hspace{0.01\textwidth}
+\begin{minipage}[t]{0.32\textwidth}
+\centerline{\psfig{figure=#3,height=#4}}
+\end{minipage}
+\raisebox{0mm}
+{\makebox[0.32\textwidth][c]{(#5)}\makebox[0.32\textwidth][c]{(#6)}
+\makebox[0.32\textwidth][c]{(#7)}
+}
+}
+\newcommand{\argmin}{\operatornamewithlimits{argmin}}
+\newcommand{\argmax}{\operatornamewithlimits{argmax}}
+
+
+\title{CS228 Project: Entropy- and Novelty-based Selection Criteria for Self-Paced Learning in SSVM with Latent Variables}
+\date{3/16/2011}
+\author{
+Laney Kuenzel ~~~~~ Danny Goodman\\
+Computer Science Department \\
+Stanford University \\
+\texttt{\{laneyk,degoodm\}@cs.stanford.edu}
+}
+
+
+\newcommand{\mthb }{\begin{eqnarray*} }
+\newcommand{\mthe }{\end {eqnarray*} }
+\newcommand{\ul}{\underline}
+\newcommand{\bd}{\textbf}
+\newcommand{\prtl}[2]{\frac{\partial #1}{\partial #2}}
+\newcommand{\drvt}[2]{\frac{d #1}{d #2}}
+\newcommand{\floor}[1]{\lfloor #1\rfloor}
+
+\nipsfinalcopy
+
+
+\begin{document}
+
+\maketitle
+\vspace{-8mm}
+
+\mysection{Introduction}
+\label{sec:introduction}
+Structural Support Vector Machines (SSVMs) are a well-known classification model that performs well on complex datasets where the form of the feature vector depends on the chosen label \cite{SSVM}.  Introducing a latent variable $\bf h$ further increases the power of the model.  SSVMs with latent variables achieve good results on motif finding in protein sequences, natural language processing, handwriting recognition, object detection, and other varied problems \cite{SPL}.  Improvements in learning this model therefore will have benefits for many applications.
+
+The latent SSVM learning problem is the following\cite{SPL}:
+
+\begin{eqnarray}
+&&\min_{{\bf w},\xi_i \geq 0} \frac{1}{2}||{\bf w}||^2 + \frac{C}{n} \sum_{i=1}^n \xi_i, \nonumber \\
+\mbox{s.t. } && \max_{h_i \in {\cal H}} {\bf w}^\top \left(\Phi({\bf x}_i,{\bf y}_i,{\bf h}_i) - 
+		\Phi({\bf x}_i,\hat{\bf y}_i,\hat{\bf h}_i) \right)
+	 \geq \Delta({\bf y}_i,\hat{\bf y}_i) - \xi_i, \nonumber \\
+\label{eq:latentSSVM}
+&&\forall \hat{\bf y}_i \in {\cal Y}, \forall \hat{h}_i \in {\cal H}, i=1,\cdots,n.
+\end{eqnarray}
+
+where $r(\cdot)$ is the SSVM regularization penalty and TODO: can we use the same formulation now that the criteria are different?  Intuitively, $\bf w$ is a parameter vector that represents how a correctly-labeled feature vector ought to look.  For a given $\bf x$, the predicted $(\bf y,\bf h)$ is the pair that maximizes $\bf{{w}} ^T \Phi(\bf x,\bf y,\bf h)$.  $\xi_i$ is the usual slack variable 
+and $\Delta(\bf y,\hat{\bf y})=1-I(\bf y=\hat{\bf y})$ is the binary loss function. TODO: is this loss right?
+
+The learning problem is non-convex and suffers from many bad local optima of the parameters $\bf w$.  One approach to overcoming this challenge is Self-Paced Learning (SPL), in which the features are first trained on an `easy' subset of the data, which is gradually expanded to include the entire training corpus\cite{SPL}.  This is based on the human intuition that people learn best starting with an easy example, which we understand clearly, and then generalizing to harder examples.  An iteration of SPL involves choosing a `easiness' $K$ and solving
+
+\begin{equation}
+({\bf w}_{t+1}, {\bf v}_{t+1}) = \argmin_{{\bf w} \in \mathbb{R}^d,{\bf v} \in \{0,1\}^n}
+\left(r({\bf w}) + \sum_{i=1}^n v_i f({\bf x}_i,{\bf y}_i; {\bf w}) -
+\frac{1}{K}\sum_{i=1}^n v_i\right).
+\label{eq:selfPacedMIP}
+\end{equation}
+
+Intuitively, the $\bf v$ are selectors for samples are learned, and will choose all samples $i$ with `difficulty' $f({\bf x}_i,{\bf y}_i; {\bf w})$ less than $\frac{1}{K}$. We have 2 (non-exclusive) rationales for how this might help in latent SSVM:
+
+\begin{enumerate}
+\item \textbf{Better Hidden Variables}.  A normal SSVM learns parameters and hidden variables at the same time.  Therefore, parameters will be influenced by a bad hidden variable selection and vice versa; we learn parameters before getting the hidden variables right and can therefore get stuck in a local optimum where neither is correct.  Training on `easy' data first gets the hidden variables right before expanding to h.
+\item \textbf{Asymmetric Performance}.  The phrase `jack of all trades' implies `master of none'.  It is possible that, when training on all data $\bf w$ gets stuck in a regime that is mediocre across all the data, while a regime that does really well on a subset of the data and worse on the rest could achieve better performance.  Training on easy data first can guide the parameters towards such asymmetric optima.
+\end{enumerate}
+
+We explore 2 novel criteria for `easiness' of a sample, one motivated by each intuition:
+
+\section{Related Work}
+SPL was proposed by Kumar et al \cite{SPL} as an improved way to solve the following SSVM problem:
+
+
+
+
+In SPL, each point is given a 
+
+Latent Variable Graphical Models (call them LVGMs) are a popular tool for learning and inference in varied applications like object detection \cite{2} and genome pathway identification \cite{1}.  LVGMs simultaneously learn a graph's structure and parameters, the exact solution of which is an NP-hard non-convex optimization problem.  A frequent difficulty occurs when an LVGM gets stuck in a bad local extremum.  Therefore, LVGMs are usually run with many different random initial conditions.  Self-Paced Learning (SPL) anneals learning so that only `easy' data points are learned at first, and more data is gradually included \cite{SPL}.  The goal is to nurse a LVGM around bad local optima by keeping it close to a growing set of well-explained training data.  The technique has improved a little on learning of latent SSVMs \cite{SPL}, and has not yet been applied to LVGMs.
+
+For this project, use the ideas in \cite{SPL}, the textbook, and \cite{Murphy} to write down a SPL algorithm for LVGMs.  Apply this algorithm to a problem where LVGMs are known to work.  If you wish to be ambitious, use a Dynamic Bayesian Network where the transition model has latent variables.  Compare the performance of SPL against a traditional learning algorithm.  For example, compare the test error, training time, and objective function.  Note the propensity of each method to find inferior local optima and speculate on reasons why / possible improvements.
+
+Some papers with application ideas are in the bibliography.
+
+
+
+\begin{thebibliography}{9}
+
+
+\bibitem{SPL} P Kumar, B Packer, and D Koller. \emph{Self-Paced Learning for Latent Variable Models},
+NIPS 2010. \url{http://ai.stanford.edu/~koller/Papers/Kumar+al:NIPS10.pdf}
+
+\bibitem{SSVM} CN Yu, T Joachims. \emph{Learning Structural SVMs with Latent Variables}. \url{www.cs.cornell.edu/~cnyu/papers/icml09_latentssvm.pdf}
+
+
+\end{thebibliography}
+
+\end{document}
