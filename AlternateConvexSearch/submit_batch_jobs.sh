@@ -21,7 +21,7 @@ do
     
     for seed in ${seeds[@]}
     do
-      job="./svm_motif_learn -c 150 -k 100 -m 1.3 -f 0.55 -v 1.0 -x 0 -z 2500 --s ${seed} data/train${prot}_${fold}.data results/motif${prot}_${fold}_s${seed}_nov.model results/motif${prot}_${fold}_s${seed}_nov"
+      job="-c 150 -k 100 -m 1.3 -f 0.55 -v 1.0 -x 0 -z 2500 --s ${seed} data/train${prot}_${fold}.data results/motif${prot}_${fold}_s${seed}_nov.model results/motif${prot}_${fold}_s${seed}_nov"
       cmd="ssh myth${myth} 'cs228/working/project/AlternateConvexSearch/background.sh ${job}'"
       echo $cmd
       $cmd
