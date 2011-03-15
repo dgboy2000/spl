@@ -38,3 +38,5 @@ double *vector_sum (double *a, double *b, int n);
 double dot_product (double *a, double *b, int n);
 
 int num_nonzero_ss (SVECTOR *a); /* Number of non-zero entries */
+
+
