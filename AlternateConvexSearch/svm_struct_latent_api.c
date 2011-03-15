@@ -88,7 +88,7 @@ SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm) {
       pchar[length_seq-1]='\0';
       length_seq--;
     }
-    if((label == 1 && pos_count < num_examples/2) || (label == -1 && neg_count < num_examples/2)) {
+    if(!sparm->reduced_size || (label == 1 && pos_count < num_examples/2) || (label == -1 && neg_count < num_examples/2)) {
       strcpy(sample.examples[j].x.seq_name, seq_name);
       sample.examples[j].y.label = label;
       sample.examples[j].x.length = length_seq;
@@ -106,6 +106,7 @@ SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm) {
       if(label == 1) pos_count++;
     } 
   }
+  
   assert(j==num_examples);
   fclose(fp);  
 

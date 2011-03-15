@@ -18,7 +18,7 @@
 #include "svm_struct_latent_api.h"
 
 
-void read_input_parameters(int argc, char **argv, char *testfile, char *modelfile, STRUCT_LEARN_PARM *sparm);
+void read_input_parameters(int argc, char **argv, char *testfile, char *modelfile, char *resultfile, STRUCT_LEARN_PARM *sparm);
 
 
 int main(int argc, char* argv[]) {
@@ -27,6 +27,7 @@ int main(int argc, char* argv[]) {
 
   char testfile[1024];
   char modelfile[1024];
+  char resultfile[1024];
 
   STRUCTMODEL model;
   STRUCT_LEARN_PARM sparm;
@@ -38,7 +39,7 @@ int main(int argc, char* argv[]) {
   LATENT_VAR h; 
 
   /* read input parameters */
-  read_input_parameters(argc,argv,testfile,modelfile,&sparm);
+  read_input_parameters(argc,argv,testfile,modelfile,resultfile,&sparm);
 
   /* read model file */
   printf("Reading model..."); fflush(stdout);
@@ -67,6 +68,10 @@ int main(int argc, char* argv[]) {
   printf("Average loss on test set: %.4f\n", avgloss/testsample.n);
   printf("Zero/one error on test set: %.4f\n", 1.0 - ((float) correct)/testsample.n);
 
+  FILE *fresult = fopen(resultfile,"w");
+  fprintf(fresult,"%.4f\n",1.0 - ((float) correct)/testsample.n);
+  fclose(fresult);
+
   free_struct_sample(testsample);
   free_struct_model(model,&sparm);
 
@@ -77,16 +82,18 @@ int main(int argc, char* argv[]) {
 
 
 
-void read_input_parameters(int argc, char **argv, char *testfile, char *modelfile, STRUCT_LEARN_PARM *sparm) {
+void read_input_parameters(int argc, char **argv, char *testfile, char *modelfile, char *resultfile, STRUCT_LEARN_PARM *sparm) {
 
   long i;
   
   /* set default */
   strcpy(modelfile, "svm_model");
   sparm->custom_argc = 0;
+  sparm->reduced_size = 0;
 
   for (i=1;(i<argc)&&((argv[i])[0]=='-');i++) {
     switch ((argv[i])[1]) {
+      case 'z': i++; sparm->reduced_size = atoi(argv[i]); break;
       case '-': strcpy(sparm->custom_argv[sparm->custom_argc++],argv[i]);i++; strcpy(sparm->custom_argv[sparm->custom_argc++],argv[i]);break;  
       default: printf("\nUnrecognized option %s!\n\n",argv[i]); exit(0);    
     }
@@ -99,6 +106,9 @@ void read_input_parameters(int argc, char **argv, char *testfile, char *modelfil
 
   strcpy(testfile, argv[i]);
   strcpy(modelfile, argv[i+1]);
+  strcpy(resultfile, argv[i+2]);
+
+  
 
   parse_struct_parameters(sparm);
 

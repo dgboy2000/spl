@@ -1,4 +1,4 @@
-function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlot, showIters, getOrder)
+function [ finalObjectives time trainerror testerror] = plotRunInfo( prot, typeRange, fold, seed, showPlot, showIters, getOrder)
 %UNTITLED Summary of this function goes here
 %   Detailed explanation goes here
 % prot      - string of which protein
@@ -7,9 +7,9 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
 % bools: showPlot, showIters, getOrder
 
     %prots = {'052','074','108','131','146'};
-    types = {'','_spl','_newHalf','_newAll','_novelty'};
-    typeNames = {'CCCP','SPL','Uncertainty-Slack','Uncertainty'};
-    resultDir = 'resultsOld';
+    types = {'','_spl','_unc','_nov'};
+    typeNames = {'CCCP','SPL','Uncertainty','Novelty'};
+    resultDir = 'results';
 
     %prot = 4;
     %type = 1;
@@ -26,9 +26,13 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
     novelty = cell(1,numel(typeRange)); %
     loss = cell(1,numel(typeRange));
     obj = cell(1,numel(typeRange));
-    time = cell(1,numel(typeRange));
+    time = zeros(1,numel(typeRange));
+    trainerror = zeros(1,numel(typeRange));
+    testerror = zeros(1,numel(typeRange));
     numIters = zeros(1,numel(typeRange));
-    numEx = 0;
+    numEx = cell(1,numel(typeRange));
+    runTrainErrors = cell(1,numel(typeRange));
+    runTestErrors = cell(1,numel(typeRange));
     
     finalObjectives = zeros(1,numel(typeRange));
     
@@ -43,9 +47,12 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
         entropyLoc = [str '.entropy'];
         noveltyLoc = [str '.novelty'];
         lossLoc = [str '.loss'];
+        trainErrorLoc = [str '.trainerror'];
+        testErrorLoc = [str '.testerror'];
 
         latent{t} = load(latentLoc);
         example{t} = load(exampleLoc);
+        numEx{t} = sum(example{t},2);
         hamming{t} = load(hammingLoc);
         slack{t} = load(slackLoc);
         entropy{t} = load(entropyLoc);
@@ -53,16 +60,26 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
         loss{t} = load(lossLoc);
         objAndTime = load(objAndTimeLoc);
         obj{t} = objAndTime(:,1);
-        time{t} = objAndTime(:,2);
-
         numIters(t) = size(example{t},1);
-        numEx = size(example{t},2);
+        time(t) = objAndTime(numIters(t),2);
+        trainerror(t) = load(trainErrorLoc);
+        testerror(t) = load(testErrorLoc);
+        
+        if showIters,
+            trainTestErrorDir = 'resultsRun';
+            str = [trainTestErrorDir '/motif' prot '_' num2str(fold) '_s' seed types{type}];
+            trainRunLoc = [str '.trainerrorfile'];
+            testRunLoc = [str '.testerrorfile'];
+            runTrainErrors{t} = load(trainRunLoc);
+            runTestErrors{t} = load(testRunLoc);
+        end
+
         
         finalObjectives(t) = obj{t}(numIters(t));
     end
 
     if showPlot,
-        figure; subplot(2,1,1);
+        figure; subplot(1,3,1);
         colors = {'r','b','g','c'};
         hold on;
         for t = 1:numel(typeRange),
@@ -71,18 +88,48 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
         end
         xlabel('Iteration');
         ylabel('Objective');
-        title(['Protein ' prot ', fold ' num2str(fold) ', and seed ' seed]);
-        subplot(2,1,2);
+        %title(['Protein ' prot ', fold ' num2str(fold) ', and seed ' seed]);
+        subplot(1,3,2);
         hold on;
         for t = 1:numel(typeRange),
             plot(hamming{t},colors{typeRange(t)},'LineWidth',3);
                 legend({typeNames{typeRange}});
         end
         xlabel('Iteration');
-        ylabel('Average Hamming Distance');
+        ylabel('Avg. Hamming Distance');
+        subplot(1,3,3);
+        hold on;
+        for t = 1:numel(typeRange),
+            plot(numEx{t},colors{typeRange(t)},'LineWidth',3);
+            legend({typeNames{typeRange}});
+        end
+        xlabel('Iteration');
+        ylabel('Number of Examples Used');
+        
+        if showIters,
+            figure; subplot(1,2,1);
+            hold on;
+            for t = 1:numel(typeRange),
+                plot(runTrainErrors{t},colors{typeRange(t)},'LineWidth',3);
+                legend({typeNames{typeRange}});
+            end
+            xlabel('Iteration');
+            ylabel('Train Error');
+            %title(['Protein ' prot ', fold ' num2str(fold) ', and seed ' seed]);
+            subplot(1,2,2);
+            hold on;
+            for t = 1:numel(typeRange),
+                plot(runTestErrors{t},colors{typeRange(t)},'LineWidth',3);
+                    legend({typeNames{typeRange}});
+            end
+            xlabel('Iteration');
+            ylabel('Test Error');
+        end
     end
     
-    if showIters,
+    if 0,
+
+        
         for t = 1:numel(typeRange),
             type = typeRange(t);
             
@@ -159,9 +206,9 @@ function [ finalObjectives ] = plotRunInfo( prot, typeRange, fold, seed, showPlo
                 orderplot = figure;
                 figure(orderplot);
                 scatter(spot{i}, spot{j}, 4);
-                title('Scatterplot of orders');
-                xlabel(['When point was added by ' typeNames{typeRange(i)} ' criteria']);
-                ylabel(['When point was added by ' typeNames{typeRange(j)} ' criteria']);
+                title('Comparison of Orders of Example Addition');
+                xlabel(['When example was added by ' typeNames{typeRange(i)} ' algorithm']);
+                ylabel(['When example was added by ' typeNames{typeRange(j)} ' algorithm']);
             end
         end
     end
