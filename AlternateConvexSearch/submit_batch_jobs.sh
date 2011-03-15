@@ -1,8 +1,8 @@
 #!/bin/bash
 
-echo "Params are:"
-echo "'$*'"
-echo "\$@ = '$@'"
+# echo "Params are:"
+# echo "'$*'"
+# echo "\$@ = '$@'"
 
 # ./svm_motif_learn -c 150 -k 100 -m 1.3 -f 0.55 -v 1.0 -x 0 -z 2500 --s 0000 data/train052_1.data results/motif052_1_s0000_nov.model results/motif052_1_s0000_nov
 
@@ -22,9 +22,9 @@ do
     for seed in ${seeds[@]}
     do
       job="-c 150 -k 100 -m 1.3 -f 0.55 -v 1.0 -x 0 -z 2500 --s ${seed} data/train${prot}_${fold}.data results/motif${prot}_${fold}_s${seed}_nov.model results/motif${prot}_${fold}_s${seed}_nov"
-      cmd="ssh myth${myth} 'cs228/working/project/AlternateConvexSearch/background.sh ${job}'"
-      echo $cmd &
-      # $cmd
+      cmd="ssh myth${myth} cs228/working/project/AlternateConvexSearch/background.sh ${job} &"
+      echo $cmd
+      $cmd 
       
       myth=$((myth+1))
       if [ $myth -gt $MAX_MYTH ]
