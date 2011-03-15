@@ -129,6 +129,62 @@ compute_qp_params (double *phi_h_star, /* \Phi(x, y, h_star) */
                    int *anumnz_save,
                    
                    double **blc_save);
+                   
+static void
+compute_qp_params_sparse (SVECTOR *phi_h_star, /* \Phi(x, y, h_star) */
+                          SVECTOR **phi_y_h_hat /* phi_y_h_hat[i] is the value of \phi for the i-th y_hat, h_hat pair */,
+                          int num_features, /* Size of w */
+                          int num_pairs, /* Number of y_hat/h_hat pairs */
+                          
+                          double *w, /* Vector of weights */
+                          double *y_loss, /* Loss function */
+                          
+                          MSKintt **aptrb_save,
+                          MSKintt **aptre_save,
+                          MSKidxt **asub_save,
+                          double **aval_save,
+                          int *anumnz_save,
+                          
+                          double **blc_save);
+                  
+/* Do the actual mosek run. If success, store params in *xx and return true.
+   Else return false */
+static bool
+do_mosek_qp (MSKboundkeye  *bkc,
+	           double        *buc,
+             double        *blc,
+                          
+             MSKboundkeye  *bkx,
+             double        *bux,
+             double        *blx,
+             
+             MSKintt       *aptrb,
+             MSKintt       *aptre,
+             MSKidxt       *asub,
+             double        *aval,
+	           int					 anumnz,
+                                  
+             MSKidxt       *qsubi,
+             MSKidxt       *qsubj,
+             double        *qval,
+             
+             double        *xx,
+             
+             int           num_features,
+             int           num_pairs);
+
+
+
+double compute_delta_w_sparse (double *w /* Vector of feature weights */,
+                               SVECTOR *phi_h_star /* \Phi(x, y, h_star) */ ,
+                               SVECTOR **phi_y_h_hat /* phi_y_h_hat[i] is the value of \phi for the i-th y_hat, h_hat pair */,
+                               double *y_loss, /* Vector of \Delta(y, y_hat) values */
+                               int num_features, /* Size of w */
+                               int num_pairs /* Number of y_hat/h_hat pairs */)
+{
+  
+}
+
 
 double compute_delta_w (double *w /* Vector of feature weights */,
                         double *phi_h_star /* \Phi(x, y, h_star) */ ,
@@ -137,9 +193,6 @@ double compute_delta_w (double *w /* Vector of feature weights */,
                         int num_features, /* Size of w */
                         int num_pairs /* Number of y_hat/h_hat pairs */)
 { 
-  
-  double        c[]   = {0.0,-1.0,0.0};
-
   MSKboundkeye  *bkc = calloc (num_pairs, sizeof (MSKboundkeye));
 	double        *buc = calloc (num_pairs, sizeof (double));
   double        *blc;
@@ -215,20 +268,87 @@ double compute_delta_w (double *w /* Vector of feature weights */,
        printf ("Lower x blx:\n"); print_double_vec(blx, num_features);
      }
   
+  do_mosek_qp (bkc,
+     	         buc,
+               blc,
+               
+               bkx,
+               bux,
+               blx,
+               
+               aptrb,
+               aptre,
+               asub,
+               aval,
+     	         anumnz,
+               
+               qsubi,
+               qsubj,
+               qval,
+               
+               xx,
+               
+               num_features,
+               num_pairs);
+
+  free (aptrb);
+  free (aptre);
+  free (asub);
+  free (aval);
+
+  free (bkc);
+  free (buc);
+  free (blc);
+  
+  free (qsubi);
+  free (qsubj);
+  free (qval);
+
+  double delta_w = vector_norm (xx, num_features);
+  free (xx);
+
+  // printf ("Computed delta_w %f\n", delta_w); //getc (stdin);
+
+  return delta_w;
+}
+
+
+
+/* Do the actual mosek run. If success, store params in *xx and return true.
+   Else return false */
+static bool
+do_mosek_qp (MSKboundkeye  *bkc,
+	           double        *buc,
+             double        *blc,
+                          
+             MSKboundkeye  *bkx,
+             double        *bux,
+             double        *blx,
+             
+             MSKintt       *aptrb,
+             MSKintt       *aptre,
+             MSKidxt       *asub,
+             double        *aval,
+	           int					 anumnz,
+                                  
+             MSKidxt       *qsubi,
+             MSKidxt       *qsubj,
+             double        *qval,
+             
+             double        *xx,
+             
+             int           num_features,
+             int           num_pairs)
+{
+  bool          mosek_status = false;
+  
+  MSKidxt       i,j;
+  MSKenv_t      env;
+  MSKtask_t     task;
+  MSKrescodee   r;
+  
   /* Create the mosek environment. */
   r = MSK_makeenv(&env,NULL,NULL,NULL,NULL);
-  
-  // MSK_infeas_report_auto ()
-
-  /* Check whether the return code is ok. */
-  // if ( r==MSK_RES_OK )
-  // {
-  //   /* Directs the log stream to the 'printstr' function. */
-  //   MSK_linkfunctoenvstream(env,
-  //                           MSK_STREAM_LOG,
-  //                           NULL,
-  //                           printstr);
-  // }
 
   /* Initialize the environment. */   
   r = MSK_initenv(env);
@@ -265,8 +385,8 @@ double compute_delta_w (double *w /* Vector of feature weights */,
         r = MSK_append(task,MSK_ACC_VAR,num_features);
   
       /* Optionally add a constant term to the objective. */
-      if ( r ==MSK_RES_OK )
-        r = MSK_putcfix(task,0.0);
+      // if ( r ==MSK_RES_OK )
+      //   r = MSK_putcfix(task,0.0);
       for(j=0; j<num_features && r == MSK_RES_OK; ++j)
       {
         /* Set the linear term c_j in the objective.*/  
@@ -373,9 +493,7 @@ double compute_delta_w (double *w /* Vector of feature weights */,
                                    xx);
               
               ++num_good;
-              // printf("Optimal primal solution\n");
-              // for(j=0; j<num_features; ++j)
-              //   printf("x[%d]: %e\n",j,xx[j]);
+              mosek_status = true;
               
               break;
             case MSK_SOL_STA_DUAL_INFEAS_CER:
@@ -417,27 +535,13 @@ double compute_delta_w (double *w /* Vector of feature weights */,
   }
   MSK_deletetask(&task);
   MSK_deleteenv(&env);
-
-  free (aptrb);
-  free (aptre);
-  free (asub);
-  free (aval);
-
-  free (bkc);
-  free (buc);
-  free (blc);
   
-  free (qsubi);
-  free (qsubj);
-  free (qval);
-
-	double delta_w = vector_norm (xx, num_features);
-	free (xx);
-
-  // printf ("Computed delta_w %f\n", delta_w); //getc (stdin);
-
-  return delta_w;
+  return mosek_status;
 }
+
+
+
+
 
 /* Computes vector difference a-b, a vector of size n */
 double *
@@ -581,9 +685,164 @@ compute_qp_params (double *phi_h_star, /* \Phi(x, y, h_star) */
 }
 
 
+/* Fills the next column with Mosek's sparse matrix format and updates num_nonzero. */
+static void
+fill_next_sparse_column (SVECTOR *svec,
+
+                         MSKintt *aptrb,
+                         MSKintt *aptre,
+                         MSKidxt *asub,
+                         double *aval,
+                         
+                         int *num_nonzero, /* Num nonzeros previously seen*/
+                         int col /* Index of the current column*/)
+{
+  aptrb[col] = *num_nonzero;
+  
+  int num = 0;
+  
+  long j;
+	int pos;
+  double weight;
+
+	j = 0;
+  pos = svec->words[j].wnum;
+	while (pos)
+		{
+      weight = svec->words[j].weight;
+			if (weight != 0)
+        {
+          asub[*num_nonzero] = weight;
+          aval[*num_nonzero] = weight;
+          ++(*num_nonzero);
+        }
+        
+			++j;	
+      pos = svec->words[j].wnum;
+		}
+
+  aptre[col] = *num_nonzero;
+}
+                         
+
+// static void
+// compute_qp_params_sparse (SVECTOR *phi_h_star, /* \Phi(x, y, h_star) */
+//                           SVECTOR **phi_y_h_hat /* phi_y_h_hat[i] is the value of \phi for the i-th y_hat, h_hat pair */,
+//                           int num_features, /* Size of w */
+//                           int num_pairs, /* Number of y_hat/h_hat pairs */
+//                           
+//                           double *w, /* Vector of weights */
+//                           double *y_loss, /* Loss function */
+//                           
+//                           MSKintt **aptrb_save,
+//                           MSKintt **aptre_save,
+//                           MSKidxt **asub_save,
+//                           double **aval_save,
+//                           int *anumnz_save,
+//                           
+//                           double **blc_save)
+// {
+//   MSKintt       *aptrb;
+//   MSKintt       *aptre;
+//   MSKidxt       *asub;
+//   double        *aval;
+//                 
+//   double        *blc;
+//   
+//   int num_nonzero = 0;
+//  int i,j;
+//  
+//   SVECTOR       *tmp;
+//   for (i=0; i<num_pairs; ++i)
+//     {
+//       tmp = sub_ss (phi_h_star, phi_y_h_hat[i]);
+//       num_nonzero += num_nonzero_ss (tmp);
+//       free_svector (tmp);
+//     }
+//         
+//   aptrb = calloc (num_features, sizeof (int));
+//   aptre = calloc (num_features, sizeof (int));
+//   asub = calloc (num_nonzero, sizeof (int));
+//   aval = calloc (num_nonzero, sizeof (double));
+//   
+//   blc = calloc (num_pairs, sizeof (double));
+//   
+//   int nz_ind = 0;
+//   double *tmp_vector;
+//   
+//   /* Compute sparse constraint matrix. The (i,j)-th entry is the j-th component
+//     of the i-th pair's feature vector diff. */
+//   for (j=0; j<num_features; ++j)
+//     {
+//       aptrb[j] = nz_ind;
+//       
+//       for (i=0; i<num_pairs; ++i)
+//         {
+//           
+//           if (phi_h_star[j] != phi_y_h_hat[i][j])
+//             {
+//               asub[nz_ind] = i;
+//               aval[nz_ind] = phi_h_star[j] - phi_y_h_hat[i][j];
+//               ++nz_ind;
+//             }
+//         }
+//       aptre[j] = nz_ind;
+//     }
+//     
+//   for (i=0; i<num_pairs; ++i)
+//     {
+//       tmp = vec
+//     }
+//     
+//   double slack = 0;
+//   int max = 0;
+//   for (i=0; i<num_pairs; ++i)
+//     {
+//       tmp_vector = vector_diff (phi_y_h_hat[i], phi_h_star, num_features);
+//       blc[i] = y_loss[i] + dot_product (tmp_vector, w, num_features);
+//       slack = MAX (slack, blc[i]);
+//       if (blc[i] == slack) {
+//         max = i;
+//       }
+//       free (tmp_vector);
+//     }
+//     
+//   if (debug)
+//     {
+//       printf ("Slack is %f, from position %d, num_pairs %d\n", slack, max, num_pairs);
+//       
+//       printf ("Features: \n"); print_double_vec (w, num_features);
+//       printf ("phi star: \n"); print_double_vec (phi_h_star, num_features);
+//       printf ("phi hat: \n"); print_double_vec (phi_y_h_hat[max], num_features);
+//     }
+//     
+//   *aptrb_save = aptrb;
+//   *aptre_save = aptre;
+//   *asub_save = asub;
+//   *aval_save = aval;
+//   *anumnz_save = num_nonzero;
+//   
+//   *blc_save = blc;
+// }
 
 
+/* Number of non-zero entries */
+int
+num_nonzero_ss (SVECTOR *a)
+{
+  int num = 0;
 
+	long j = 0;
+	while (a->words[j].wnum)
+		{
+			if (a->words[j].weight != 0)
+        ++num;
+        
+			++j;	
+		}
+
+  return num;
+}
 
 
 
