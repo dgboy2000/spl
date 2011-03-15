@@ -1,7 +1,7 @@
 prots = {'052','074','108','131','146'};
 seeds = {'0000','0001'};
 folds = 1:5;
-types = 1:3;
+types = 1:4;
 
 objInfo = cell(length(prots),1);
 trainErrorInfo = cell(length(prots),1);
