@@ -1,0 +1,85 @@
+
+\documentclass[12pt]{article}
+
+\newcommand{\name}{Laney Kuenzel}
+\newcommand{\datedue}{Thursday, January 20, 2011}
+\newcommand{\classname}{CS 261 }
+\newcommand{\psetnum}{1}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\ra}{\overline{a}}
+\newcommand{\ol}[1]{\overline{#1}}
+
+%\pagestyle{headings}
+\usepackage[dvips]{graphics,color}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage{latexsym}
+\usepackage{enumerate}
+\setlength{\parskip}{1pc}
+\setlength{\parindent}{0pt}
+\setlength{\topmargin}{-4.5pc}
+\setlength{\textheight}{9.5in}
+\setlength{\oddsidemargin}{-2pc}
+\setlength{\evensidemargin}{0pc}
+\setlength{\textwidth}{6.5in}
+
+
+
+
+\begin{document}
+
+\begin{table}
+\caption{Final Objective Values Across Algorithms}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline Protein Number  & CCCP & SPL & Uncertainty \\\hline
+1 & \textbf{57.49} $\pm$ \textbf{1.70} & $57.80 \pm 1.47$ & $57.52 \pm 1.67$\\
+2 & $85.04 \pm 2.73$ & $84.67 \pm 3.14$ & \textbf{83.89} $\pm$ \textbf{2.26}\\
+3 & $91.32 \pm 29.58$ & $78.27 \pm 4.51$ & \textbf{75.33} $\pm$ \textbf{4.27}\\
+4 & $94.63 \pm 27.74$ & $79.93 \pm 1.59$ & \textbf{79.27} $\pm$ \textbf{1.06}\\
+5 & $73.86 \pm 38.07$ & $54.26 \pm 1.09$ & \textbf{54.04} $\pm$ \textbf{0.84}\\\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+\begin{table}
+\caption{Train Errors Across Algorithms}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline Protein Number  & CCCP & SPL & Uncertainty \\\hline
+1 & $12.74 \pm 0.79$ & $12.79 \pm 0.75$ & \textbf{12.66} $\pm$ \textbf{0.74}\\
+2 & $23.68 \pm 1.32$ & $23.07 \pm 1.27$ & \textbf{22.62} $\pm$ \textbf{0.90}\\
+3 & $25.58 \pm 12.28$ & $19.90 \pm 1.76$ & \textbf{19.07} $\pm$ \textbf{1.65}\\
+4 & $26.38 \pm 11.22$ & $21.30 \pm 1.57$ & \textbf{20.46} $\pm$ \textbf{0.58}\\
+5 & $20.27 \pm 14.88$ & $12.56 \pm 0.46$ & \textbf{12.49} $\pm$ \textbf{0.15}\\\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+\begin{table}
+\caption{Test Errors Across Algorithms}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline Protein Number  & CCCP & SPL & Uncertainty \\\hline
+1 & \textbf{31.65} $\pm$ \textbf{0.43} & $31.77 \pm 0.47$ & \textbf{31.65}$\pm$ \textbf{0.35}\\
+2 & $31.44 \pm 0.40$ & \textbf{30.83} $\pm$ \textbf{0.27} & $31.02 \pm 0.18$\\
+3 & $33.79 \pm 8.12$ & $30.33 \pm 0.77$ & \textbf{29.85} $\pm$ \textbf{0.51}\\
+4 & $34.95 \pm 7.12$ & $31.49 \pm 0.30$ & \textbf{31.43} $\pm$ \textbf{0.43}\\
+5 & $32.36 \pm 8.83$ & $27.97 \pm 0.27$ & \textbf{27.90} $\pm$ \textbf{0.28}\\\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+\begin{table}
+\caption{Average Run Time (Seconds) Across Algorithms}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline & CCCP & SPL & Uncertainty \\\hline
+Time & $397.35 \pm 291.37$ & $642.61 \pm 330.48$ & $460.10 \pm 237.29$\\\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+\end{document}
