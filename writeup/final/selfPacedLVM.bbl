@@ -1,0 +1,133 @@
+\begin{thebibliography}{10}
+
+\bibitem{allgower90}
+E.~Allgower and K.~Georg.
+\newblock {\em Numerical continuation methods: {A}n introduction}.
+\newblock Springer-Verlag, 1990.
+
+\bibitem{bazaraa93}
+M.~Bazaraa, H.~Sherali, and C.~Shetty.
+\newblock {\em Nonlinear Programming - Theory and Algorithms}.
+\newblock John Wiley and Sons, Inc., 1993.
+
+\bibitem{bengioicml09}
+Y.~Bengio, J.~Louradour, R.~Collobert, and J.~Weston.
+\newblock Curriculum learning.
+\newblock In {\em ICML}, 2009.
+
+\bibitem{bergercell08}
+M.~Berger, G.~Badis, A.~Gehrke, and S.~Talukder~et al.
+\newblock Variation in homeodomain {DNA} binding revealed by high-resolution
+  analysis of sequence preferences.
+\newblock {\em Cell}, 27, 2008.
+
+\bibitem{blumcolt98}
+A.~Blum and T.~Mitchell.
+\newblock Combining labeled and unlabeled data with co-training.
+\newblock In {\em COLT}, 98.
+
+\bibitem{cohnjair96}
+D.~Cohn, Z.~Ghahramani, and M.~Jordan.
+\newblock Active learning with statistical models.
+\newblock {\em JAIR}, 4:129--145, 1996.
+
+\bibitem{dalalcvpr05}
+N.~Dalal and B.~Triggs.
+\newblock Histograms of oriented gradients for human detection.
+\newblock In {\em CVPR}, 2005.
+
+\bibitem{dempsterjrss77}
+A.~Dempster, N.~Laird, and D.~Rubin.
+\newblock Maximum likelihood from incomplete data via the {EM} algorithm.
+\newblock {\em Journal of Royal Statistical Society}, 39(1):1--38, 1977.
+
+\bibitem{felzenszwalbcvpr08}
+P.~Felzenszwalb, D.~Mc{A}llester, and D.~Ramanan.
+\newblock A discriminatively trained, multiscale, deformable part model.
+\newblock In {\em CVPR}, 2008.
+
+\bibitem{finleyicml05}
+T.~Finley and T.~Joachims.
+\newblock Supervised clustering with support vector machines.
+\newblock In {\em ICML}, 2005.
+
+\bibitem{floudasjota93}
+C.~Floudas and V.~Visweswaran.
+\newblock Primal-relaxed dual global optimization approach.
+\newblock {\em Journal of Optimization Theory and Applications},
+  78(2):187--225, 1993.
+
+\bibitem{gelman95}
+A.~Gelman, J.~Carlin, H.~Stern, and D.~Rubin.
+\newblock {\em Bayesian Data Analysis}.
+\newblock Chapman and Hall, 1995.
+
+\bibitem{heitzijcv09}
+G.~Heitz, G.~Elidan, B.~Packer, and D.~Koller.
+\newblock Shape-based object localization for descriptive classification.
+\newblock {\em IJCV}, 2009.
+
+\bibitem{joachimsml09}
+T.~Joachims, T.~Finley, and C.-N. Yu.
+\newblock Cutting-plane training for structural {SVM}s.
+\newblock {\em Machine Learning}, 77(1):27--59, 2009.
+
+\bibitem{lecunieee98}
+Y.~LeCun, L.~Bottou, Y.~Bengio, and P.~Haffner.
+\newblock Gradient based learning applied to document recognition.
+\newblock {\em Proceedings of the IEEE}, 86(11):2278--2324, 1998.
+
+\bibitem{ngacl02}
+V.~Ng and C.~Cardie.
+\newblock Improving machine learning approaches to coreference resolution.
+\newblock In {\em ACL}, 2002.
+
+\bibitem{nigamcikm00}
+K.~Nigam and R.~Ghani.
+\newblock Analyzing the effectiveness and applicability of co-training.
+\newblock In {\em CIKM}, 2000.
+
+\bibitem{simardnips91}
+P.~Simard, B.~Victorri, Y.~Le{C}un, and J.~Denker.
+\newblock Tangent {P}rop - a formalism for specifying selected invariances in
+  adaptive network.
+\newblock In {\em NIPS}, 1991.
+
+\bibitem{sriperumbudurnips09}
+B.~Sriperumbudur and G.~Lanckriet.
+\newblock On the convergence of concave-convex procedure.
+\newblock In {\em NIPS Workshop on Optimization for Machine Learning}, 2009.
+
+\bibitem{taskarnips03}
+B.~Taskar, C.~Guestrin, and D.~Koller.
+\newblock Max-margin {M}arkov networks.
+\newblock In {\em NIPS}, 2003.
+
+\bibitem{tongjmlr01}
+S.~Tong and D.~Koller.
+\newblock Support vector machine active learning with applications to text
+  classification.
+\newblock {\em JMLR}, 2:45--66, 2001.
+
+\bibitem{tsochantaridisicml04}
+I.~Tsochantaridis, T.~Hofmann, Y.~Altun, and T.~Joachims.
+\newblock Support vector machine learning for interdependent and structured
+  output spaces.
+\newblock In {\em ICML}, 2004.
+
+\bibitem{yuicml09}
+C.-N. Yu and T.~Joachims.
+\newblock Learning structural {SVM}s with latent variables.
+\newblock In {\em ICML}, 2009.
+
+\bibitem{yuillenc03}
+A.~Yuille and A.~Rangarajan.
+\newblock The concave-convex procedure.
+\newblock {\em Neural Computation}, 15, 2003.
+
+\bibitem{zhangicml07}
+K.~Zhang, I.~Tsang, and J.~Kwok.
+\newblock Maximum margin clustering made practical.
+\newblock In {\em ICML}, 2007.
+
+\end{thebibliography}
