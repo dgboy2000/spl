@@ -163,32 +163,37 @@ f(\bf x, \bf y; \bf w) &=&\min_{\Delta w} \frac{1}{2}||{\Delta\bf w}||^2, \nonum
 
 Intuitively, $\Delta w$ is the smallest change we have to make to $\bf w$ in order to correctly classify $\bf x$ with slack 0.  
 
-We implemented uncertainty- and novelty-based selection criteria, analyzed their performance, and compared the results to CCCP \cite{SSVM} and slack-based SPL \cite{SPL}.
+Now that we have described the general concepts behind our uncertainty- and novelty-based selection criteria, we go into the details of their implementation.
+
+%We now describe the implementation of the uncertainty- and novelty-based selection criteria.
+
+%We implemented uncertainty- and novelty-based selection criteria, analyzed their performance, and compared the results to CCCP \cite{SSVM} and slack-based SPL \cite{SPL}.
 
 \mysection{Implementation}
 \label{sec:Implementation}
-We chose to test our criteria on the problem of identifying motifs in protein sequences.  This problem has been studied for both latent SSVM \cite{SSVM} and SPL \cite{SPL}, so it was a natural starting point to evaluate new criteria.
+%We chose to test our criteria on the problem of identifying motifs in protein sequences.  This problem has been studied for both latent SSVM \cite{SSVM} and SPL \cite{SPL}, so it was a natural starting point to evaluate new criteria.
 
-We modified the SPL code from \cite{SPL} to simulate our new objectives. The existing code solved the SPL problem using an outer loop for hidden variable computation and an inner loop for parameter updates and sample inclusion using Alternate Convex Search ({\sc ACS}) \cite{SPL} and the Constrained Concave-Convex Procedure ({\sc CCCP}) \cite{SSVM}.
+We extended the SPL code from \cite{SPL} to implement our new methods. The existing code solved the SPL problem using an outer loop for hidden variable computation and an inner loop for parameter updates and sample inclusion.
+ %using Alternate Convex Search ({\sc ACS}) \cite{SPL} and the Constrained Concave-Convex Procedure ({\sc CCCP}) \cite{SSVM}.
 
 \begin{algorithm}[h!]
 \mytopcaption{Outer Loop: The self-paced learning algorithm for parameter estimation of latent {\sc ssvm}.}
 \label{algo:selfPacedLatentSSVM}
 \begin{algorithmic}[1]
-\INPUT ${\cal D} = \{({\bf x}_1,{\bf y}_1),\cdots,({\bf x}_n,{\bf y}_n)\}$, ${\bf w}_0$, $K_0$, $\epsilon$.
+\INPUT ${\cal D} = \{({\bf x}_1,{\bf y}_1),\cdots,({\bf x}_n,{\bf y}_n)\}$, ${\bf w}_0$, $K_0$, $\epsilon$, $\mu$.
 \STATE $t \leftarrow 0$, $K \leftarrow K_0$.
 \REPEAT
-\STATE Update $h_i^* = \argmax_{h_i \in {\cal H}} {\bf w}_{t}^\top \Phi({\bf x}_i,{\bf y}_i,{\bf h}_i)$.
+\STATE Update $h_i^* = \argmax_{h_i \in {\cal H}} {\bf w}_{t}^\top \Phi({\bf x}_i,{\bf y}_i,{\bf h}_i)\ \forall i$.
 \STATE Update ${\bf w}_{t+1}$ by using {\sc acs} to minimize the objective
-$\frac{1}{2}||{\bf w}||^2 + \frac{C}{n} \sum_{i=1}^n v_i\xi_i$ subject to the contraints in~(\ref{eq:latentSSVM}) and $v_i=I\left(f({\bf x_i,\bf y_i;\bf w}) < \frac{1}{K}\right)$.
+$\frac{1}{2}||{\bf w}||^2 + \frac{C}{n} \sum_{i=1}^n v_i\xi_i$ subject to the contraints in~(\ref{eq:latentSSVM}) and $v_i=I\left\{f({\bf x_i,\bf y_i;\bf w}) < \frac{1}{K}\right\}$.
 \STATE $t \leftarrow t + 1$, $K \leftarrow K/\mu$.
-\UNTIL{$v_i = 1, \forall i$ and the objective function cannot be decreased below tolerance $\epsilon$.}
+\UNTIL{$v_i = 1\ \forall i$ and the objective function cannot be decreased below tolerance $\epsilon$.}
 \end{algorithmic}
 \end{algorithm}
 
-The outer loop alternates between choosing the best hidden variable for each example and optimizing the parameters \& selected examples.  Each successive iteration through the outer loop lowers the easiness barrier for including samples, until all samples are included.
+The outer loop alternates between choosing the best hidden variable for each example and optimizing the parameters and selected examples.  Each successive iteration through the outer loop lowers the easiness barrier for including samples, until all samples are included.
 
-The parameter-estimation-and-sample-inclusion step is executed by an inner loop that alternates between selecting the currently active samples and updating the parameters ({\sc ACS}).  The parameter update step is a latent SSVM is solved using the {\sc CCCP} algorithm \cite{SSVM}, which alternates between finding the most violated constraint (the concave part):
+The parameter-estimation-and-sample-inclusion step is executed by an inner loop that alternates between selecting the currently active samples and updating the parameters ({\sc ACS}).  The parameter update step is a latent SSVM that is solved using the {\sc CCCP} algorithm \cite{SSVM}, which alternates between finding the most violated constraint (the concave part):
 \mthb
 {\bf\bar y_i,\bf\bar h_i} = \argmax_{{\bf\hat y_i},{\bf\hat h_i}} \Delta({\bf y_i,\bf\hat y_i})+{\bf w}^\top\Phi(\bf x_i,\bf\hat y_i,\bf\hat h_i)
 \mthe
