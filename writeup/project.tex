@@ -195,7 +195,7 @@ $\frac{1}{2}||{\bf w}||^2 + \frac{C}{n} \sum_{i=1}^n v_i\xi_i$ subject to the co
 
 The outer loop alternates between choosing the best hidden variable for each example and optimizing the parameters and selected examples.  Each successive iteration through the outer loop lowers the easiness barrier for including samples, until all samples are included.
 
-The parameter-estimation-and-sample-inclusion step is executed by an inner loop that alternates between selecting the currently active samples and updating the parameters ({\sc ACS}).  The parameter update step is a latent SSVM that is solved using the {\sc CCCP} algorithm \cite{SSVM}, which alternates between finding the most violated constraint (the concave part):
+The parameter-estimation-and-sample-inclusion step is executed by an inner loop of Alternate Convex Search ({\sc ACS}) \cite{SPL}, which alternates between selecting the currently active samples and updating the parameters.  The parameter update step is a latent SSVM that is solved using the Constrained Concave-Convex Procedure ({\sc CCCP}) \cite{SSVM}, which alternates between finding the most violated constraint (the concave part)
 \mthb
 {\bf\bar y_i,\bf\bar h_i} = \argmax_{{\bf\hat y_i},{\bf\hat h_i}} \Delta({\bf y_i,\bf\hat y_i})+{\bf w}^\top\Phi(\bf x_i,\bf\hat y_i,\bf\hat h_i)
 \mthe
