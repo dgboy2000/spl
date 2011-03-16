@@ -106,7 +106,7 @@ The latent SSVM learning problem is the following \cite{SPL}:
 Intuitively, $\bf w\in\mathbb{R}^d$ is a parameter vector that represents how a correctly-labeled $d$-dimensional feature vector $\Phi$ should look.  The variable $\xi_i$ represents the slack, and $\Delta(\bf y,\hat{\bf y})=I\{\bf y\neq \hat{\bf y}\}$ is the binary loss function.
 For a given example $\bf x$, the predicted $(\bf y,\bf h)$ is the pair that maximizes $\bf{{w}} ^\top \Phi(\bf x,\bf y,\bf h)$.  
 
-This learning problem is highly non-convex due to the presence of the hidden variables $\bf h$, and it suffers from many bad local optima of the parameters $\bf w$.  One approach to overcoming this challenge is Self-Paced Learning (SPL), proposed by Kumar \textit{et al.} [1]. In SPL, $\bf w$ is first trained on an `easy' subset of the data, which is gradually expanded to include the entire training corpus \cite{SPL}.  This algorithm is based on the intuition that people learn best starting with easy material and then generalizing to progressively harder material.  An iteration of SPL involves choosing an `easiness' threshold $K$ and solving
+This learning problem is highly non-convex due to the presence of the hidden variables $\bf h$, and it suffers from many bad local optima of the parameters $\bf w$.  One approach to overcoming this challenge is Self-Paced Learning (SPL), proposed by Kumar \textit{et al.} [1]. In SPL, $\bf w$ is first trained on an `easy' subset of the data, which is gradually expanded to include the entire training corpus.  This algorithm is based on the intuition that people learn best starting with easy material and then generalizing to progressively harder material.  An iteration of SPL involves choosing an `easiness' threshold $K$ and then solving
 
 \begin{eqnarray}
 {\bf w}_{t+1} &=& \argmin_{{\bf w} \in \mathbb{R}^d}
@@ -117,36 +117,40 @@ This learning problem is highly non-convex due to the presence of the hidden var
 
 subject to the constraints of~(\ref{eq:latentSSVM}). The binary variables $v_i$ indicate whether sample $i$ is used for training at the given iteration; if a sample's difficulty function $f$ is within the threshold, it will be selected.  In the original formulation of SPL, the difficulty function $f({\bf x_i, \bf y_i; \bf w}) = \frac{C}{n}\xi_i$, so~(\ref{eq:selfPacedMIP}) can be expressed as the single equation (4) in \cite{SPL}.
 
-The experiments described in \cite{SPL} demonstrate that SPL 
+%We have two rationales for why the approach of SPL performs better than standard latent SSVMs:
 
-We have two rationales for why the approach of SPL performs better than standard latent SSVMs:
+%Intuitively, $v_i=1$ iff sample $\bf x_i,\bf y_i$ is included in the `easy' training set, which happens iff `difficulty' $f({\bf x}_i,{\bf y}_i; {\bf w})$ is less than $\frac{1}{K}$. 
 
-%Intuitively, $v_i=1$ iff sample $\bf x_i,\bf y_i$ is included in the `easy' training set, which happens iff `difficulty' $f({\bf x}_i,{\bf y}_i; {\bf w})$ is less than $\frac{1}{K}$. We have 2 (non-exclusive) rationales for how this might help in latent SSVM:
+We have two (non-exclusive) rationales for how the SPL approach might help in latent SSVM:
 
 \begin{enumerate}
-\item \textbf{Better Hidden Variables}.  A normal SSVM learns parameters $\bf w$ and hidden variables $\bf h$ at the same time.  Therefore, $\bf w$ can be optimized based on incorrect hidden variables $\bf h$ and vice versa; $\bf w$ is optimized before getting $\bf h$ right and can therefore get stuck in a local optimum where neither is correct.  Training on `easy' data first gets the hidden variable model right before tuning $\bf w$ on the entire dataset $\mathcal D$.
-\item \textbf{Asymmetric Performance}.  The phrase `jack of all trades' implies `master of none.'  It is possible that, when training on all of $\mathcal D$, $\bf w$ gets stuck in a regime that is uniformly mediocre across $\mathcal D$, while a regime that does really well on a subset of $\mathcal D$ and worse on the other examples could achieve better performance.  Training on easy data first can guide $\bf w$ towards such asymmetric optima.
+\item \textbf{Better Hidden Variables}.  A standard latent SSVM learns parameters $\bf w$ and hidden variables $\bf h$ at the same time (for example, by alternating between imputing values for $\bf h$ and updating $\bf w$).  Therefore, $\bf w$ can be learned based on incorrect hidden variables $\bf h$ and vice versa, which can cause the algorithm to get stuck in a local optimum where neither $\bf h$ nor $\bf w$ is correct. Training on easy data first allows us to get the hidden variable model right before tuning $\bf w$ on the entire dataset $\mathcal D$.
+\item \textbf{Asymmetric Performance}. The phrase `jack of all trades' implies `master of none.'  It is possible that, when training on all of $\mathcal D$, $\bf w$ gets stuck in a regime that is uniformly mediocre across $\mathcal D$. A regime which performs very well on a substantial subset of $\mathcal D$ and worse on the other examples could achieve better overall performance. Training on easy data first can guide $\bf w$ towards such asymmetric optima.
 \end{enumerate}
 
-We explore 2 novel criteria for `easiness' of a sample, one motivated by each above intuition.
+In the remainder of the paper, we explore two novel criteria for `easiness' of a sample, one motivated by each above intuition.
 
 \mysection{Related Work and Our Extension}
 \label{sec:related}
-SPL was recently proposed by Kumar et al \cite{SPL}.  They use the slack variable $\xi_i$ as a measure of the difficulty of a sample.  Slack is a natural criterion because $\xi_i=0$ indicates a correctly classified sample and larger $\xi_i$ indicates greater distance (in feature space) from the correct classification boundary.  Kumar et al. show approximately 1\% improvement in training objective, training error, and test error across four different applications from vision, language, and biology\cite{SPL}.
+In SPL as proposed in \cite{SPL}, the slack variable $\xi_i$ is used as a measure of the difficulty of a sample.  Slack is a natural selection criterion because $\xi_i=0$ indicates a sample that is correctly classified beyond the margin, and larger $\xi_i$ indicates greater distance (in feature space) from the correct classification boundary. Kumar \textit{et al.} show approximately 1\% improvement in training objective, training error, and test error across four different applications from vision, language, and biology \cite{SPL}.
 
 \subsection{Uncertainty}
 
-Slack, however, is at least partially independent of whether we have learned the correct hidden variable.  If we learn an incorrect parameter vector that predicts incorrect hidden variables, we will keep including points with low slack but possibly-incorrect hidden variables.  Therefore, we choose a criterion that should encourage better hidden variable selection.
+Slack is at least partially independent of whether we have learned the correct hidden variable. More specifically, it is possible to have examples that we classify correctly with low slack despite having inferred the hidden variable incorrectly. Such examples will be included for training by standard SPL, which could cause us to learn bad parameters. 
 
-Hidden variables and other learning abstractions are used because they are \emph{useful}: they allow a simpler or more accurate model of complex dynamics.  We explore a criterion called \textbf{Uncertainty} that marks examples as `easy' when we are certain of their hidden variables $\bf h$ given the correct label $\bf y$:
+With this idea in mind, we developed a novel criterion for easiness which attempts to prevent the selection of samples for which we are not confident about the hidden variable value. This criterion, which we call \textbf{Uncertainty}, marks examples as easy when we are certain of their hidden variables $\bf h$ given the correct label $\bf y$: 
 
 \begin{eqnarray}
 f(\bf x, \bf y; \bf w) &=& \sum_{\bf\tilde{h}} \bf\tilde p({\tilde h}) \log\bf\tilde p(\bf{\tilde h}),  \\
 \bf{\tilde{p}(\tilde h)} &=&\frac{\sigma(\bf{w}^\top\Phi(\bf x,y, \tilde h))}{\sum_{h}\sigma(\bf w^\top\Phi(\bf x,\bf y,\bf h))}, \nonumber \\
-\sigma(\bf x) &=& \frac{1}{1+\exp(-1.5\cdot\bf x)} \nonumber
+\sigma(\bf z) &=& \frac{1}{1+\exp(\frac{{\bf z} - z_0}{v})} \nonumber
 \label{eq:uncertainty}
 \end{eqnarray}
-We used a sigmoid with midpoint $0$, and slope $1.5$.
+
+--LANEY STOPPED HERE 
+
+TODO: move this We used a sigmoid with midpoint $0$, and slope $1.5$.
+
 If we interpret the sigmoid of the score of hidden variable $\bf \hat h$ as a probability, $\bf\tilde p(\bf \hat h)$, then the uncertainty has a natural interpretation as the entropy of the motif location.  We hypothesize that training first on examples on which we are confident of the hidden variable will encode a better hidden variable model in the parameters $\bf w$.
 
 
