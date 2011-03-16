@@ -160,9 +160,7 @@ f(\bf x, \bf y; \bf w) &=&\min_{\Delta w} \frac{1}{2}||{\Delta\bf w}||^2, \\
 &&\forall \hat{\bf y} \in {\cal Y}, \forall \hat{h} \in {\cal H}, i=1,\cdots,n. \nonumber
 \end{eqnarray}
 
-Intuitively, $\Delta w$ is the smallest change we have to make to $\bf w$ in order to correctly classify $\bf x$ with slack 0.  
-
-TODO: write a hypothesis here that parallels the uncertainty hypo
+Intuitively, $\Delta w$ is the smallest change we have to make to $\bf w$ in order to correctly classify $\bf x$ with slack 0.  We hypothesized that the novelty criterion would preferentially learn `asymmetric' parameters $\bf w$ that were expert on a subset of the data $\mathcal{D}$ and bad at the rest.
 
 To test our hypotheses about the uncertainty- and novelty-based selection criteria, we implemented variants of SPL based on these criteria and conducted experiments to evaluate their performance relative to CCCP and standard SPL.
 
