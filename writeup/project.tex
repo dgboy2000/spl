@@ -232,14 +232,79 @@ We first compare the best 2 selection criteria, slack and uncertainly, in the le
 
 The right-most plot in Figure \ref{fig:order} shows that novelty and slack seem to be inversely related: higher densities of points in the top left and bottom right quadrants indicate that examples chosen early by slack are more likely to be chosen late by novelty, and vice versa. This is consistent with novelty getting stuck in really bad local optima significantly more often than slack.
 
-(OUTLINE)
-\begin{itemize}
 
-\item Results were relatively similar and we were interested in understanding whether they were choosing the same examples. Show order comparison graph.
-\item Show bounding box results. Wondering about non-maximal suppression. 
-\end{itemize}
+\mysection{Future Work}
+\label{sec:futureWork}
 
-\begin{table}
+There are several interesting directions for future investigation. Most immediately, the SPL-Uncertainty algorithm should be applied to other problems to determine whether its strong performance generalizes. We obtained preliminary results for the object localization problem described in \cite{SPL}. In this problem, the examples are images containing objects of a particular type (in our experiment, each image contained a certain type of mammal), and the goal is to determine which type of object each image contains. The hidden variable is the location of the bounding box surrounding the object. 
+
+Our dataset, as in \cite{SPL}, consisted of 271 images, each one containing one of 6 mammals. We used five folds (90\% train, 10\% test) to evaluate the algorithms and obtained the results displayed in Table \ref{tbl:bbox}.  
+
+Further investigations are needed to understand the performance of these algorithms in a more detailed way.  In addition, the use of entropy is confounded here by the fact that bounding boxes very near to each other will achieve similar scores, a feature which is not present in the motif problem, where neighboring subsequences will have extremely large hamming distances.  A non-maximal suppression technique may be helpful in computing the entropy.  Application of the entropy criterion to other datasets would also be informative.
+
+Additionally, it is likely that SPL training time for all algorithms can be significantly improved by solving fewer quadratic programs.  For example, when SPL has not yet included the entire training set, we can probably afford a less strict threshold for convergence of $\bf w$ that will run fewer iterations of the inner loop.
+
+We do not believe that varying the parameters of the sigmoid used in computing the uncertainty will have significant impact since it is not the \emph{value} of the uncertainty that is meaningful, but rather the \emph{order}.  Our results suggest that performance is not very sensitive rate of annealing.
+
+\mysection{Conclusion}
+\label{sec:conclusion}
+
+We have explored 2 novel inclusion criteria for Self-Paced Learning ({\sc SPL}): \textbf{uncertainty} and \textbf{novelty}.  Of these, uncertainty performed better than slack in most cases, improving objective value and train/test error, and avoiding really bad local optima.  Uncertainty therefore seems to be an improved selection criterion over slack, even though the performance for the two was similar.  This supports the intuition that Self-Paced Learning works by learning a better hidden variable model, encoded in the parameters $\bf w$.  It also suggests that SPL is a robust idea and that further improvements may be possible.  Given the widespread applications of latent SSVM, such improvements can pay dividends in may areas.
+
+Novelty, on the other hand, performed poorly compared to slack by getting stuck in bad local optima in 52\% of runs, exactly the opposite of the goal of SPL.  We hypothesize that this is because the novelty criteria preferentially chooses training examples that don't change $\bf w$ much, essentially `trying to get stuck'.  Novelty, therefore, does not seem to be a promising avenue for further research.
+
+\myparagraph{Acknowledgements.}
+Thanks to Pawan Kumar and Ben Packer for being generous with their time and expertise.
+
+\appendix
+
+\newpage
+
+\mysection{Algorithms}
+\label{sec:algs}
+
+\begin{algorithm}[h!]
+\mytopcaption{Outer Loop: The self-paced learning algorithm for parameter estimation of latent {\sc ssvm}.}
+\label{algo:selfPacedLatentSSVM}
+\begin{algorithmic}[1]
+\INPUT ${\cal D} = \{({\bf x}_1,{\bf y}_1),\cdots,({\bf x}_n,{\bf y}_n)\}$, ${\bf w}_0$, $K_0$, $\epsilon$.
+\STATE $t \leftarrow 0$, $K \leftarrow K_0$.
+\REPEAT
+\STATE Update $h_i^* = \argmax_{h_i \in {\cal H}} {\bf w}_{t}^\top \Phi({\bf x}_i,{\bf y}_i,{\bf h}_i)$.
+\STATE Update ${\bf w}_{t+1}$ by using {\sc acs} to minimize the objective
+$\frac{1}{2}||{\bf w}||^2 + \frac{C}{n} \sum_{i=1}^n v_i\xi_i$ subject to the contraints in~(\ref{eq:latentSSVM}) and $v_i=I\left(f({\bf x_i,\bf y_i;\bf w}) < \frac{1}{K}\right)$.
+\STATE $t \leftarrow t + 1$, $K \leftarrow K/\mu$.
+\UNTIL{$v_i = 1, \forall i$ and the objective function cannot be decreased below tolerance $\epsilon$.}
+\end{algorithmic}
+\end{algorithm}
+
+
+\begin{algorithm}[h!]
+\mytopcaption{Inner Loop: Parameter estimation and example inclusion in \sc{SPL}.}
+\label{algo:latentSSVM}
+\begin{algorithmic}[1]
+\INPUT ${\cal D} = \{({\bf x}_1,{\bf y}_1),\cdots,({\bf x}_n,{\bf y}_n)\}$, ${\bf w}_0$, $\epsilon$, $h_i^*$.
+\STATE $t \leftarrow 0$
+\REPEAT
+\STATE Update $v_i = 1$ if $f(\bf x_i, \bf y_i;\bf w_t) < \frac{1}{K}$, $v_i=0$ otherwise.  Recall that $f$ is the `difficulty' of a sample, either its uncertainty~(\ref{eq:uncertainty}) or novelty~(\ref{eq:novelty}) in this work, or the slack variable in \cite{SPL}.
+\STATE Update ${\bf w}_{t+1}$ by solving the corresponding
+{\sc ssvm} problem over the samples with $v_i=1$. Specifically, \\
+${\bf w}_{t+1} = \argmin_{\bf w} \frac{1}{2}||{\bf w}||^2 + \frac{C}{n}\sum_{i} v_i\max\{0,\Delta({\bf y}_i,\hat{\bf y}_i) +
+		{\bf w}^\top (\Phi({\bf x}_i,\hat{\bf y}_i,\hat{\bf h}_i) - \Phi({\bf x}_i,{\bf y}_i,{\bf h}_i^*))\}$.
+\STATE $t \leftarrow t + 1$.
+\UNTIL{Objective function cannot be decreased below tolerance $\epsilon$.}
+\end{algorithmic}
+\end{algorithm}
+
+
+\newpage
+
+\mysection{Tables}
+\label{sec:tables}
+
+
+
+\begin{table}[h]
 \begin{center}
 \subfigure[Final Objective Values] {
 \begin{tabular}{|c|c|c|c|c|c|}
@@ -283,43 +348,8 @@ $397.35 \pm 291.37$ & $642.61 \pm 330.48$ & $460.10 \pm 237.29$ & $3085.39 \pm 3
 \end{table}
 
 
-\mysection{Future Work}
-\label{sec:futureWork}
 
-There are several interesting directions for future investigation. Most immediately, the SPL-Uncertainty algorithm should be applied to other problems to determine whether its strong performance generalizes. We obtained preliminary results for the object localization problem described in \cite{SPL}. In this problem, the examples are images containing objects of a particular type (in our experiment, each image contained a certain type of mammal), and the goal is to determine which type of object each image contains. The hidden variable is the location of the bounding box surrounding the object. 
-
-Our dataset, as in \cite{SPL}, consisted of 271 images, each one containing one of 6 mammals. We used five folds (90\% train, 10\% test) to evaluate the algorithms and obtained the results displayed in Table \ref{tbl:bbox}.  
-
-Further investigations are needed to understand the performance of these algorithms in a more detailed way.  In addition, the use of entropy is confounded here by the fact that bounding boxes very near to each other will achieve similar scores, a feature which is not present in the motif problem, where neighboring subsequences will have extremely large hamming distances.  A non-maximal suppression technique may be helpful in computing the entropy.  Application of the entropy criterion to other datasets would also be informative.
-
-Additionally, it is likely that SPL training time for all algorithms can be significantly improved by solving fewer quadratic programs.  For example, when SPL has not yet included the entire training set, we can probably afford a less strict threshold for convergence of $\bf w$ that will run fewer iterations of the inner loop.
-
-We do not believe that varying the parameters of the sigmoid used in computing the uncertainty will have significant impact since it is not the \emph{value} of the uncertainty that is meaningful, but rather the \emph{order}.  Our results suggest that performance is not very sensitive rate of annealing.
-
-
-TODO: Do we need any of this?
-we have several types of objects (in this case, different mammals) and 
- images containing a particular type of object .
-
-bla.
-\mysection{Conclusion}
-\label{sec:conclusion}
-
-We have explored 2 novel inclusion criteria for Self-Paced Learning ({\sc SPL}): \textbf{uncertainty} and \textbf{novelty}.  Of these, uncertainty performed better than slack in most cases, improving objective value and train/test error, and avoiding really bad local optima.  Uncertainty therefore seems to be an improved selection criterion over slack, even though the performance for the two was similar.  This supports the intuition that Self-Paced Learning works by learning a better hidden variable model, encoded in the parameters $\bf w$.  It also suggests that SPL is a robust idea and that further improvements may be possible.  Given the widespread applications of latent SSVM, such improvements can pay dividends in may areas.
-
-Novelty, on the other hand, performed poorly compared to slack by getting stuck in bad local optima in 52\% of runs, exactly the opposite of the goal of SPL.  We hypothesize that this is because the novelty criteria preferentially chooses training examples that don't change $\bf w$ much, essentially `trying to get stuck'.  Novelty, therefore, does not seem to be a promising avenue for further research.
-
-(OUTLINE)
-\begin{itemize}
-\item Explain 
-\end{itemize}
-
-\myparagraph{Acknowledgements.}
-Thanks to Pawan Kumar and Ben Packer for being generous with their time and expertise.
-
-APPENDIX STUFF
-
-\begin{table}
+\begin{table}[h]
 \caption{Performance of slack-based SPL is similar for different annealing rates (better slack result appears in \textbf{bold}).  Uncertainty outperforms slack on 4 of 5 proteins (shown in \emph{italics} to avoid confusion).}
 \begin{center}
 \begin{tabular}{|c|c|c|c|c|c|}
@@ -334,46 +364,8 @@ APPENDIX STUFF
 \label{tbl:faster}
 \end{table}
 
-\appendix
-\mysection{Algorithms}
-\label{sec:algs}
 
-\begin{algorithm}[h!]
-\mytopcaption{Outer Loop: The self-paced learning algorithm for parameter estimation of latent {\sc ssvm}.}
-\label{algo:selfPacedLatentSSVM}
-\begin{algorithmic}[1]
-\INPUT ${\cal D} = \{({\bf x}_1,{\bf y}_1),\cdots,({\bf x}_n,{\bf y}_n)\}$, ${\bf w}_0$, $K_0$, $\epsilon$.
-\STATE $t \leftarrow 0$, $K \leftarrow K_0$.
-\REPEAT
-\STATE Update $h_i^* = \argmax_{h_i \in {\cal H}} {\bf w}_{t}^\top \Phi({\bf x}_i,{\bf y}_i,{\bf h}_i)$.
-\STATE Update ${\bf w}_{t+1}$ by using {\sc acs} to minimize the objective
-$\frac{1}{2}||{\bf w}||^2 + \frac{C}{n} \sum_{i=1}^n v_i\xi_i$ subject to the contraints in~(\ref{eq:latentSSVM}) and $v_i=I\left(f({\bf x_i,\bf y_i;\bf w}) < \frac{1}{K}\right)$.
-\STATE $t \leftarrow t + 1$, $K \leftarrow K/\mu$.
-\UNTIL{$v_i = 1, \forall i$ and the objective function cannot be decreased below tolerance $\epsilon$.}
-\end{algorithmic}
-\end{algorithm}
-
-
-\begin{algorithm}[h!]
-\mytopcaption{Inner Loop: Parameter estimation and example inclusion in \sc{SPL}.}
-\label{algo:latentSSVM}
-\begin{algorithmic}[1]
-\INPUT ${\cal D} = \{({\bf x}_1,{\bf y}_1),\cdots,({\bf x}_n,{\bf y}_n)\}$, ${\bf w}_0$, $\epsilon$, $h_i^*$.
-\STATE $t \leftarrow 0$
-\REPEAT
-\STATE Update $v_i = 1$ if $f(\bf x_i, \bf y_i;\bf w_t) < \frac{1}{K}$, $v_i=0$ otherwise.  Recall that $f$ is the `difficulty' of a sample, either its uncertainty~(\ref{eq:uncertainty}) or novelty~(\ref{eq:novelty}) in this work, or the slack variable in \cite{SPL}.
-\STATE Update ${\bf w}_{t+1}$ by solving the corresponding
-{\sc ssvm} problem over the samples with $v_i=1$. Specifically, \\
-${\bf w}_{t+1} = \argmin_{\bf w} \frac{1}{2}||{\bf w}||^2 + \frac{C}{n}\sum_{i} v_i\max\{0,\Delta({\bf y}_i,\hat{\bf y}_i) +
-		{\bf w}^\top (\Phi({\bf x}_i,\hat{\bf y}_i,\hat{\bf h}_i) - \Phi({\bf x}_i,{\bf y}_i,{\bf h}_i^*))\}$.
-\STATE $t \leftarrow t + 1$.
-\UNTIL{Objective function cannot be decreased below tolerance $\epsilon$.}
-\end{algorithmic}
-\end{algorithm}
-
-\mysection{Tables}
-\label{sec:tables}
-\begin{table}
+\begin{table}[h]
 \caption{The results (reported as mean $\pm$ standard deviation) for the three algorithms in the bounding box application. }
 \begin{center}
 \begin{tabular}{|c|c|c|c|}
@@ -387,6 +379,9 @@ Run Time (sec) & $858.96 \pm 140.62$ & $1421.66 \pm 100.14$ & \textbf{544.32} $\
 \label{tbl:bbox}
 \end{table}
 
+
+
+\newpage
  
 \begin{thebibliography}{9}
 
