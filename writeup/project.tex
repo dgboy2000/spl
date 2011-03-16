@@ -60,7 +60,7 @@
 \newcommand{\argmax}{\operatornamewithlimits{argmax}}
 
 
-\title{CS228 Project: Uncertainty- and Novelty-based Selection Criteria for Self-Paced Learning in SSVM with Latent Variables}
+\title{CS228 Project: Uncertainty- and Novelty-Based Selection Criteria for Self-Paced Learning in SSVM with Latent Variables}
 \date{3/16/2011}
 \author{
 Laney Kuenzel ~~~~~ Danny Goodman\\
@@ -86,11 +86,11 @@ Stanford University \\
 \maketitle
 \vspace{-8mm}
 
-\mysection{Introductionx}
+\mysection{Introduction}
 \label{sec:introduction}
-Structural Support Vector Machines (SSVMs) are a type of discriminative classification model that performs well on complex datasets where the form of the feature vector $\Phi(\bf x, \bf y)$ depends on the chosen label $\bf y$ \cite{SSVM}.  Introducing a latent variable $\bf h$ into the feature vector $\Phi(\bf x, \bf y, \bf h)$ further increases the power of the model.  For example, $\bf h$ could be used to mark a region of interest in the input $\bf x$, such as a bounding box of an object in an image, or the location of a motif in a protein sequence.  We call such models \emph{latent SSVMs}
+Structural Support Vector Machines (SSVMs) are a type of discriminative classification model that performs well on complex datasets where the form of the feature vector $\Phi(\bf x, \bf y)$ depends on the chosen label $\bf y$ \cite{SSVM}.  Introducing a latent variable $\bf h$ into the feature vector $\Phi(\bf x, \bf y, \bf h)$ further increases the power of the model.  For example, $\bf h$ could be used to mark a region of interest in the input $\bf x$, such as a bounding box of an object in an image, or the location of a protein-binding motif in a DNA sequence.  We call such models \emph{latent SSVMs}
 
-Latent SSVMs achieve good results on motif finding in protein sequences, natural language processing, handwriting recognition, object detection, and other varied problems \cite{SPL,App1,SSVM}.  Improvements in learning latent SSVMs will therefore have benefits for many applications.
+Latent SSVMs achieve strong results on diverse problems, including motif finding in DNA sequences, natural language processing, handwriting recognition, and object detection \cite{SPL,App1,SSVM}.  Improvements in learning latent SSVMs will therefore have benefits for many applications.
 
 The latent SSVM learning problem is the following \cite{SPL}:
 
@@ -103,25 +103,29 @@ The latent SSVM learning problem is the following \cite{SPL}:
 &&\forall \hat{\bf y}_i \in {\cal Y}, \forall \hat{h}_i \in {\cal H}, i=1,\cdots,n.
 \end{eqnarray}
 
-Intuitively, $\bf w\in\mathbb{R}^d$ is a parameter vector that represents how a correctly-labeled $d$-dimensional feature vector $\Phi$ ought to look.  For a given $\bf x$, the predicted $(\bf y,\bf h)$ is the pair that maximizes $\bf{{w}} ^\top \Phi(\bf x,\bf y,\bf h)$.  $\xi_i$ is the usual slack variable 
-and $\Delta(\bf y,\hat{\bf y})=1-I(\bf y=\hat{\bf y})$ is the binary loss function.
+Intuitively, $\bf w\in\mathbb{R}^d$ is a parameter vector that represents how a correctly-labeled $d$-dimensional feature vector $\Phi$ should look.  The variable $\xi_i$ represents the slack, and $\Delta(\bf y,\hat{\bf y})=I\{\bf y\neq \hat{\bf y}\}$ is the binary loss function.
+For a given example $\bf x$, the predicted $(\bf y,\bf h)$ is the pair that maximizes $\bf{{w}} ^\top \Phi(\bf x,\bf y,\bf h)$.  
 
-This learning problem is highly non-convex due to hidden variables $\bf h$ and suffers from many bad local optima of the parameters $\bf w$.  One approach to overcoming this challenge is Self-Paced Learning (SPL), in which $\bf w$ is first trained on an `easy' subset of the data, which is gradually expanded to include the entire training corpus\cite{SPL}.  This is based on the intuition that people learn best starting from an easy example and generalizing to progressively harder examples.  An iteration of SPL involves choosing an `easiness' threshold $K$ and solving
+This learning problem is highly non-convex due to the presence of the hidden variables $\bf h$, and it suffers from many bad local optima of the parameters $\bf w$.  One approach to overcoming this challenge is Self-Paced Learning (SPL), proposed by Kumar \textit{et al.} [1]. In SPL, $\bf w$ is first trained on an `easy' subset of the data, which is gradually expanded to include the entire training corpus \cite{SPL}.  This algorithm is based on the intuition that people learn best starting with easy material and then generalizing to progressively harder material.  An iteration of SPL involves choosing an `easiness' threshold $K$ and solving
 
 \begin{eqnarray}
 {\bf w}_{t+1} &=& \argmin_{{\bf w} \in \mathbb{R}^d}
 \left(\frac{1}{2}\|{\bf w}\|^2 + \frac{C}{n}\sum_{i=1}^n v_i \xi_i\right), \nonumber \\
-{v}_i &=& I \left( f({\bf x_i},{\bf y_i};{\bf w}) < \frac{1}{K} \right)
+{v}_i &=& I \left\{ f({\bf x_i},{\bf y_i};{\bf w}) < \frac{1}{K} \right\}
 \label{eq:selfPacedMIP}
 \end{eqnarray}
 
-subject to the constraints of~(\ref{eq:latentSSVM}).  Intuitively, $v_i$ indicates whether sample $i$ is selected using the indicator function $I(\cdot)$ to assess whether the difficulty $f$ is within the threshold.  For the special case where $f({\bf x_i, \bf y_i; \bf w}) = \frac{C}{n}\xi_i$,~(\ref{eq:selfPacedMIP}) can be expressed as the single equation 4 in \cite{SPL}.
+subject to the constraints of~(\ref{eq:latentSSVM}). The binary variables $v_i$ indicate whether sample $i$ is used for training at the given iteration; if a sample's difficulty function $f$ is within the threshold, it will be selected.  In the original formulation of SPL, the difficulty function $f({\bf x_i, \bf y_i; \bf w}) = \frac{C}{n}\xi_i$, so~(\ref{eq:selfPacedMIP}) can be expressed as the single equation (4) in \cite{SPL}.
 
-Intuitively, $v_i=1$ iff sample $\bf x_i,\bf y_i$ is included in the `easy' training set, which happens iff `difficulty' $f({\bf x}_i,{\bf y}_i; {\bf w})$ is less than $\frac{1}{K}$. We have 2 (non-exclusive) rationales for how this might help in latent SSVM:
+The experiments described in \cite{SPL} demonstrate that SPL 
+
+We have two rationales for why the approach of SPL performs better than standard latent SSVMs:
+
+%Intuitively, $v_i=1$ iff sample $\bf x_i,\bf y_i$ is included in the `easy' training set, which happens iff `difficulty' $f({\bf x}_i,{\bf y}_i; {\bf w})$ is less than $\frac{1}{K}$. We have 2 (non-exclusive) rationales for how this might help in latent SSVM:
 
 \begin{enumerate}
 \item \textbf{Better Hidden Variables}.  A normal SSVM learns parameters $\bf w$ and hidden variables $\bf h$ at the same time.  Therefore, $\bf w$ can be optimized based on incorrect hidden variables $\bf h$ and vice versa; $\bf w$ is optimized before getting $\bf h$ right and can therefore get stuck in a local optimum where neither is correct.  Training on `easy' data first gets the hidden variable model right before tuning $\bf w$ on the entire dataset $\mathcal D$.
-\item \textbf{Asymmetric Performance}.  The phrase `jack of all trades' implies `master of none'.  It is possible that, when training on all of $\mathcal D$, $\bf w$ gets stuck in a regime that is uniformly mediocre across $\mathcal D$, while a regime that does really well on a subset of $\mathcal D$ and worse on the other examples could achieve better performance.  Training on easy data first can guide $\bf w$ towards such asymmetric optima.
+\item \textbf{Asymmetric Performance}.  The phrase `jack of all trades' implies `master of none.'  It is possible that, when training on all of $\mathcal D$, $\bf w$ gets stuck in a regime that is uniformly mediocre across $\mathcal D$, while a regime that does really well on a subset of $\mathcal D$ and worse on the other examples could achieve better performance.  Training on easy data first can guide $\bf w$ towards such asymmetric optima.
 \end{enumerate}
 
 We explore 2 novel criteria for `easiness' of a sample, one motivated by each above intuition.
@@ -356,7 +360,8 @@ NIPS 2010. \url{http://ai.stanford.edu/~koller/Papers/Kumar+al:NIPS10.pdf}
 
 \bibitem{SSVM} CN Yu, T Joachims. \emph{Learning Structural SVMs with Latent Variables}. \url{www.cs.cornell.edu/~cnyu/papers/icml09_latentssvm.pdf}
 
-\bibitem{App1} PF Felzenszwalb, RB Girshick, D McAllester and D Ramanan. \emph{Object Detection with Discriminatively TrainedPart Based Models}.  \url{http://www.ics.uci.edu/~dramanan/papers/latentmix.pdf}
+\bibitem{App1} PF Felzenszwalb, RB Girshick, D McAllester and D Ramanan. \emph{Object Detection with Discriminatively Trained
+Part Based Models}.  \url{http://www.ics.uci.edu/~dramanan/papers/latentmix.pdf}
 
 \bibitem{Mosek} The MOSEK Optimization Software. \url{http://www.mosek.com/}
 
