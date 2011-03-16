@@ -154,6 +154,7 @@ TODO: move this We used a sigmoid with midpoint $0$, and slope $1.5$.
 If we interpret the sigmoid of the score of hidden variable $\bf \hat h$ as a probability, $\bf\tilde p(\bf \hat h)$, then the uncertainty has a natural interpretation as the entropy of the motif location.  We hypothesize that training first on examples on which we are confident of the hidden variable will encode a better hidden variable model in the parameters $\bf w$.
 
 
+
 TODO: should we do a run with a different sigmoid parameter.
 
 \subsection{Novelty}
@@ -353,9 +354,24 @@ bla.
 
 Ben and Pawan
 
+APPENDIX STUFF
 
 
+\begin{table}
+\caption{OBJECTIVES - annealing question}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline Protein Number  & SPL ($m=1.3$) & SPL ($m=2.0$) \\\hline
+1 & $57.78 \pm 1.48$ & $57.84 \pm 1.50$ \\ \hline
+2 & $84.67 \pm 3.14$ & $84.83 \pm 3.30$ \\ \hline
+3 & $78.27 \pm 4.51$ & $76.42 \pm 4.24$ \\ \hline
+4 & $79.93 \pm 1.59$ & $79.93 \pm 1.57$ \\ \hline
+5 & $54.26 \pm 1.09$ & $54.02 \pm 1.12$ \\ \hline
+\end{tabular}
+\end{center}
+\end{table}
 
+Generally, 
 \begin{thebibliography}{9}
 
 
