@@ -217,7 +217,7 @@ TODO: in introduction, explanation of SPL formula for updating w and v, make sur
 
 We applied uncertainty- and novelty-based selection criteria to the motif finding problem described in \cite{SPL} and \cite{SSVM}. The examples in this problem are DNA sequences of fixed length, and the goal is to classify the sequences based on whether they bind to a particular protein. We assume that all of the sequences that do bind to the protein share a very similar pattern of nucleotide bases, called a ``motif.'' The hidden variable is the starting position of this motif within the sequence.
 
-We followed a similar experimental procedure to that described in \cite{SPL}. We obtained positive and negative sequences for five randomly-chosen proteins from the UniProbe dataset. For each protein, we had approximately 40,000 DNA sequences. For each protein, we used five folds, and for each fold we chose 5,000 training sequences and 20,000 testing sequences. For each of the four algorithms (CCCP, SPL, SPL-Uncertainty, and SPL-Novelty) and each fold, we did two runs with different random initializations of the motif positions. These initializations were the same across the four algorithms. We use the better of the two initializations, as judged by final value of the objective function, when reporting results for a given protein, fold, and algorithm. 
+We followed a similar experimental procedure to that described in \cite{SPL}. We obtained positive and negative sequences for five randomly-chosen proteins from the UniProbe dataset. For each protein, we had approximately 40,000 DNA sequences. For each protein, we used five folds of 5,000 training sequences and 20,000 testing sequences. For each of the four algorithms (CCCP, SPL, SPL-Uncertainty, and SPL-Novelty) and each fold, we did two runs with different random initializations of the motif positions. These initializations were the same across the four algorithms. We use the better of the two initializations, as judged by final value of the objective function, when reporting results for a given protein, fold, and algorithm. 
 
 The results are displayed in Table \ref{tbl:motif}. The SPL-Uncertainty algorithm exhibited the strongest overall performance and ran in less time than slack-based SPL. The statistics for the SPL-Novelty algorithm are unusual in that the standard deviations are very large. In general, for a given run, the SPL-Novelty algorithm either performed on par with the SPL and SPL-Uncertainty algorithms or got stuck in a very bad local optimum. For example, for the fifth protein, we saw that SPL-Novelty actually outperformed all other algorithms for two of the folds but performed very poorly for the other three folds, explaining its high mean objective value for that protein. 
 
@@ -229,19 +229,19 @@ To gain further insight into how the SPL-Uncertainty algorithm was working, we e
 
 \begin{figure}
 \includegraphics[scale = 0.7]{ExampleMotifRun_WithNovelty_small2.png}
-\caption{Data obtained from running the four algorithms on a single protein, fold, and seed.}
+\caption{Objective value, average hamming distance, and number of included training examples in each iteration for the four learning algorithms on a single protein, fold, and seed.}
 \label{fig:exrun}
 \end{figure}
 
 The rightmost plot, which shows the number of examples used by the various algorithms over iterations, is very informative. The addition of examples is much more gradual in the SPL algorithm than in the SPL-Uncertainty or SPL-Novelty algorithms, not only in this particular run but in general. After just a couple of iterations, both the SPL-Uncertainty and SPL-Novelty algorithms had included all of the training examples. By examining the uncertainty, slack, and novelty values for the training examples over time, we identified the cause of this behavior: as better parameters are learned, the uncertainty and novelty drop much more quickly than the slack. In general, we note that because it adds all of the examples to the training set so quickly, the SPL-Uncertainty algorithm is more similar in its dynamics to CCCP than to SPL. For instance, the ``hump'' in the objective curve characteristic of standard SPL is absent from the objective curve of the SPL-Uncertainty algorithm. 
 
-TODO: Above paragraph may need adjusting: this is plotted over outer iteration, but inner loop does a lot of iterations that we don't see here. Further, this behavior is tuned by a parameter $\mu$ for how quickly things anneal.  We may just have chosen criteria that require different values of $\mu$ to anneal at the same rate, e.g. maybe we'd better better results if we tuned $\mu$ to anneal faster on SPL.  Hump may depend just on how quickly we anneal, maybe there would be hump in inner loop?
+TODO: describe how 'dynamics are more similar to CCCP'.  Include results about annealing
 
 As another measure of performance, we considered the Hamming distance (the minimum number of substitutions required to convert one string to another of equal length) between motifs in positive examples. The middle plot in Figure \ref{fig:exrun} shows the average Hamming distance for selected samples over iterations. Consistent with the observations in \cite{SPL}, we saw that the Hamming distance for SPL tended to start low, increase as more difficult examples are introduced, and then decrease again once all examples have been included. For SPL-Uncertainty, due to the rapid introduction of all examples, we see only a brief increase in average Hamming distance followed by a longer period of decrease. This observation supports the conclusion that, in general, SPL-Uncertainty is less of a departure from CCCP than SPL. 
 
-TODO: I don't know about the `less of a departure' conclusion.  I'd explain the hamming distance results by talking about hidden variables, and how uncertainty focuses on getting the hidden variables right.  the hidden varaible is the motif location, so avg hamming dist starts small.  The other criteria are more agnostic to this.
+TODO: Mention why hamming distance is lower to start for uncertainty: we include so few positive examples.  
 
-%**talk about annealing factor. what part of it is annealing factor and what part is order? We wondered whether the only difference was the same examples being added but faster for SPL-Uncertainty, so we plotted bla.
+%TODO **talk about annealing factor. what part of it is annealing factor and what part is order? We wondered whether the only difference was the same examples being added but faster for SPL-Uncertainty, so we plotted bla.
 
 As a final area of investigation, we asked how different are the new criteria, uncertainty and novelty, from the original algorithm's criterion, slack? We wanted to understand whether uncertainty and novelty were adding examples in the same general order as slack-based SPL. To answer this question, we plotted the \emph{order} in which samples are first selected by one criterion against another, as shown in Figure \ref{fig:order}. A point at ($i$, $j$) indicates that the $i$-th example selected by criteria {\sc X} was the $j$-th point selected by criteria {\sc Y}.  If the criteria are equal the plot is a line, and if they are totally unrelated, the plot is white noise.  In SPL, examples are actually added in batches, so within a batch we ordered examples by increasing criterion value at time of addition.  In SPL an example may be included one iteration, then rejected in a later iteration, then included again.  In order to compare orderings across two different criteria, we included an example in the ordering at most once corresponding to the first SPL iteration in which it is included.  Finally, because there is only uncertainty over $\bf h$ in positive sequences, we only compare the order of inclusion of positive DNA sequences that bind to the protein.
 
@@ -251,15 +251,14 @@ As a final area of investigation, we asked how different are the new criteria, u
 \label{fig:order}
 \end{figure}
 
-We observe, at left, that slack and uncertainty select from similar pools of points in the first and second halves of their training, as revealed by the two rectangular blocks in the bottom left and top right of the plot.  Interestingly, the points seem to be uniformly scattered within each rectangle.  The
+We first compare the best 2 selection criteria, slack and uncertainly, in the left-most plot.  We observe that they select from similar pools of points in the first and second halves of their training, as revealed by the two rectangular blocks in the bottom left and top right of the plot.  Interestingly, the points seem to be uniformly scattered within each rectangle.  This suggests that slack and uncertainty are somewhat similar, and helps understand how both algorithms do significantly better than {\sc CCCP} at avoiding really bad local optima.  Interestingly, both orderings agree most tightly on the very hardest samples, leading to a cluster in the top right of the graph.  This suggests that SPL may be more about excluding hard samples than choosing easy ones.
 
+The right-most plot in Figure \ref{fig:order} shows that novelty and slack seem to be inversely related: higher densities of points in the top left and bottom right quadrants indicate that examples chosen early by slack are more likely to be chosen late by novelty, and vice versa. This is consistent with novelty getting stuck in really bad local optima significantly more often than slack.
 
 (OUTLINE)
 \begin{itemize}
 
-\item Show graphs. Say that uncertainty added examples more quickly. We wondered if this was why SPL was doing badly so tried five runs with SPL annealing factor higher, so that it would add examples more quickly. We saw that generally in four of five it caused the objective to increase. By a lot [if this is true?]. So it seems like uncertainty is more effective- better criterion, gets us what we want.
 \item Results were relatively similar and we were interested in understanding whether they were choosing the same examples. Show order comparison graph.
-\item Say that it did well so we wanted to try another application. Did not try novelty because it did not perform as well and because it took prohibitively long to run.
 \item Show bounding box results. Wondering about non-maximal suppression. 
 \end{itemize}
 
@@ -339,6 +338,16 @@ bla.
 \end{itemize}
 
 \section{Conclusion}
+
+We have explored 2 novel inclusion criteria for Self-Paced Learning ({\sc SPL}): \textbf{uncertainty} and \textbf{novelty}.  Of these, uncertainty performed better than slack in most cases, improving objective value and train/test error, and avoiding really bad local optima.  The performance of these two criteria are more similar to each other than to SPL on all metrics.  This supports the intuition that Self-Paced Learning works by learning a better hidden variable model, encoded in the parameters $\bf w$
+
+Novelty, on the other hand, performed poorly compared to slack
+
+
+TODO: annealing, some better some worse, show table.  Then we look at order.
+
+TODO: entropy numbers aren't important, just the order and how they interact w/annealing.
+
 
 (OUTLINE)
 \begin{itemize}
