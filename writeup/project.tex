@@ -173,7 +173,9 @@ Now that we have described the general concepts behind our uncertainty- and nove
 \label{sec:Implementation}
 %We chose to test our criteria on the problem of identifying motifs in protein sequences.  This problem has been studied for both latent SSVM \cite{SSVM} and SPL \cite{SPL}, so it was a natural starting point to evaluate new criteria.
 
-We extended the SPL code from \cite{SPL} to implement our new methods. The existing code solved the SPL problem using an outer loop for hidden variable computation and an inner loop for parameter updates and sample inclusion.
+We extended the SPL code from \cite{SPL} to implement our new methods. The existing code solved the SPL problem using an outer loop for hidden variable computation and an inner loop for parameter updates and sample inclusion, as described in CITE ALG.
+
+%move the acs and cccp part below to next paragraph (in middle of doing)
  %using Alternate Convex Search ({\sc ACS}) \cite{SPL} and the Constrained Concave-Convex Procedure ({\sc CCCP}) \cite{SSVM}.
 
 \begin{algorithm}[h!]
