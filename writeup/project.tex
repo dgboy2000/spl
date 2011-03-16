@@ -146,41 +146,32 @@ f(\bf x, \bf y; \bf w) &=& \sum_{\bf\tilde{h}} \bf\tilde p({\tilde h}) \log\bf\t
 \sigma(\bf z) &=& \frac{1}{1+\exp(\frac{{\bf z} - z_0}{k})} \nonumber
 \label{eq:uncertainty}
 \end{eqnarray}
-See sections (\ref{sec:implementation}) and (\ref{sec:futureWork}) about the sigmoid's midpoint $z_0$ and width $k$.
-
-If we interpret $\bf\tilde p(\bf h)$, the normalized sigmoid function of the score for hidden variable $\bf h$, as a probability, then the uncertainty has a natural interpretation as the entropy of the distribution over hidden variable values. We hypothesized that using the uncertainty criterion would prevent us from attempting to learn $\bf w$ from examples in which we have imputed the wrong hidden variable value, thereby allowing us to learn a better set of parameters $\bf w$. 
+where $z_0$ and $k$ give the sigmoid's midpoint and width, discussed in further detail in Sections~\ref{sec:implementation} and~\ref{sec:futureWork}. If we interpret $\bf\tilde p(\bf h)$, the normalized sigmoid function of the score for hidden variable $\bf h$, as a probability, then the uncertainty has a natural interpretation as the entropy of the distribution over hidden variable values. We hypothesized that using the uncertainty criterion would prevent us from attempting to learn $\bf w$ from examples in which we have imputed the wrong hidden variable value, thereby allowing us to learn a better set of parameters $\bf w$. 
 
 \subsection{Novelty}
 Our second intuition was that we should train on examples in the order in which they are easiest to \emph{learn}.  The slack $\xi_i$ represents the extent to which a point violates our \emph{current knowledge}, $\bf w$.  Even if $\xi_i$ is big, it may be possible to make a small change to $\bf w$ to \emph{learn} this point and send the slack $\xi_i$ to zero.  With this intuition, we define the \textbf{Novelty} of an example $(\bf x, \bf y)$ to a parameter vector $\bf w$ as follows:
 
 \begin{eqnarray}
-f(\bf x, \bf y; \bf w) &=&\min_{\Delta w} \frac{1}{2}||{\Delta\bf w}||^2, \nonumber \\
+f(\bf x, \bf y; \bf w) &=&\min_{\Delta w} \frac{1}{2}||{\Delta\bf w}||^2, \\
 \mbox{s.t. } && \max_{h \in {\cal H}} \left( {\bf w}^\top + \Delta\bf w \right) \left(\Phi({\bf x},{\bf y},{\bf h}) - 
 		\Phi({\bf x},\hat{\bf y},\hat{\bf h}) \right)
 	 \geq \Delta({\bf y},\hat{\bf y}) , \nonumber \\
 \label{eq:novelty}
-&&\forall \hat{\bf y} \in {\cal Y}, \forall \hat{h} \in {\cal H}, i=1,\cdots,n.
+&&\forall \hat{\bf y} \in {\cal Y}, \forall \hat{h} \in {\cal H}, i=1,\cdots,n. \nonumber
 \end{eqnarray}
 
 Intuitively, $\Delta w$ is the smallest change we have to make to $\bf w$ in order to correctly classify $\bf x$ with slack 0.  We hypothesized that the novelty criterion would preferentially learn `asymmetric' parameters $\bf w$ that were expert on a subset of the data $\mathcal{D}$ and bad at the rest.
 
-Now that we have described the general concepts behind our uncertainty- and novelty-based selection criteria, we go into the details of their implementation.
+To test our hypotheses about the uncertainty- and novelty-based selection criteria, we implemented variants of SPL based on these criteria and conducted experiments to evaluate their performance relative to CCCP and standard SPL.
 
-\mysection{Implementation}
+\mysection{Implementation and Experiments}
 \label{sec:implementation}
 
-%We now describe the implementation of the uncertainty- and novelty-based selection criteria.
+We chose to apply our two extensions to SPL to the motif finding problem described in \cite{SPL} and \cite{SSVM}. The examples in this problem are DNA sequences of fixed length, and the goal is to classify the sequences based on whether they bind to a particular protein. We assume that all of the sequences that do bind to the protein share a very similar pattern of nucleotide bases, called a ``motif.'' The hidden variable is the starting position of this motif within the sequence.
 
-%We implemented uncertainty- and novelty-based selection criteria, analyzed their performance, and compared the results to CCCP \cite{SSVM} and slack-based SPL \cite{SPL}.
+To implement our algorithms, we extended the SPL code from \cite{SPL}. The existing code solved the SPL problem using an outer loop for hidden variable computation and an inner loop for parameter updates and sample inclusion. Pseudocode for this algorithm can be found in Algorithm \ref{algo:selfPacedLatentSSVM} of Appendix \ref{sec:algs}.
 
-%We chose to test our criteria on the problem of identifying motifs in protein sequences.  This problem has been studied for both latent SSVM \cite{SSVM} and SPL \cite{SPL}, so it was a natural starting point to evaluate new criteria.
-
-We extended the SPL code from \cite{SPL} to implement our new methods. The existing code solved the SPL problem using an outer loop for hidden variable computation and an inner loop for parameter updates and sample inclusion, as described in CITE ALG.
-
-%move the acs and cccp part below to next paragraph (in middle of doing)
- %using Alternate Convex Search ({\sc ACS}) \cite{SPL} and the Constrained Concave-Convex Procedure ({\sc CCCP}) \cite{SSVM}.
-
-The outer loop alternates between choosing the best hidden variable for each example and optimizing the parameters and selected examples.  Each successive iteration through the outer loop lowers the easiness barrier for including samples, until all samples are included.
+The outer loop alternates between imputing the best hidden variable for each example and optimizing the parameters and selected examples.  Each successive iteration through the outer loop lowers the easiness barrier for including samples, until all samples are included.
 
 The parameter-estimation-and-sample-inclusion step is executed by an inner loop of Alternate Convex Search ({\sc ACS}) \cite{SPL}, which alternates between selecting the currently active samples and updating the parameters.  The parameter update step is a latent SSVM that is solved using the Constrained Concave-Convex Procedure ({\sc CCCP}) \cite{SSVM}, which alternates between finding the most violated constraint (the concave part)
 \mthb
@@ -188,11 +179,11 @@ The parameter-estimation-and-sample-inclusion step is executed by an inner loop 
 \mthe
 and optimizing the parameters $\bf w$ in a convex approximation of latent SSVM given $(\bf y, \bf h)$.  We refer the reader to \cite{SSVM} for more details.
 
-Computing the uncertainty of a sample~\ref{eq:uncertainty} involves a simple loop over all possible hidden variable positions to compute $\sigma$.  The resulting $\sigma$ vector is normalized and its entropy is computed.  In computing the sigmoid, we used midpoint $z_0=0$ and width $k=1.5$ (see equation (\ref{eq:uncertainty})).
+Computing the uncertainty of a sample according to (\ref{eq:uncertainty}) involves a simple loop over all possible hidden variable positions to compute $\sigma$.  The resulting $\sigma$ vector is normalized and its entropy is computed.  In computing the sigmoid, we used midpoint $z_0=0$ and width $k=1.5$.
 
-One practical difficulty in the motif data is that `negative examples' -- those with ${\bf y}=-1$ that do not contain the motif -- have only one possible hidden variable position ${\bf h}=-1$, and therefore uncertainty 0.  This means that all negative samples will be included before any positive samples are included.  We set our initial parameter $K$ so that at least 10\% of the positive examples are included as well. 
+One practical difficulty in the motif data is that `negative examples' -- those with ${\bf y}=-1$ that do not contain the motif -- have only one possible hidden variable position ${\bf h}=-1$, and therefore uncertainty 0.  This means that all negative samples will be selected for training before any positive samples are selected.  We set our initial threshold parameter $K$ to ensure that at least 10\% of the positive examples are included in the first iteration. 
 
-Computing the novelty is more complicated as it involves solving the quadratic program~(\ref{eq:novelty}) for each sample.  We wrote an interface {\sc mosek\_api.c} to the MOSEK optimization suite \cite{Mosek} to solve this problem.  We verified the implementation of our interface on a simple problem with known analytical solution with {\sc ./TEST\_MOSEK}.  The computational complexity of this problem slows the computation considerably compared to other SPL selection criteria.
+Computing the novelty is more complicated, as it involves solving the quadratic program~(\ref{eq:novelty}) for each sample.  We wrote an interface {\sc mosek\_api.c} to the MOSEK optimization suite \cite{Mosek} to solve this problem.  We verified the implementation of our interface on a simple problem with known analytical solution.  The computational complexity of this problem slows the computation considerably compared to other SPL selection criteria.
 
 TODO: in introduction, explanation of SPL formula for updating w and v, make sure that it's clear what f, w, and v are, say we explain it more clearly later, etc.
 
@@ -201,7 +192,7 @@ TODO: make everything past tense?
 \mysection{Results and Analysis}
 \label{sec:results}
 
-We applied uncertainty- and novelty-based selection criteria to the motif finding problem described in \cite{SPL} and \cite{SSVM}. The examples in this problem are DNA sequences of fixed length, and the goal is to classify the sequences based on whether they bind to a particular protein. We assume that all of the sequences that do bind to the protein share a very similar pattern of nucleotide bases, called a ``motif.'' The hidden variable is the starting position of this motif within the sequence.
+
 
 We followed a similar experimental procedure to that described in \cite{SPL}. We obtained positive and negative sequences for five randomly-chosen proteins from the UniProbe dataset. For each protein, we had approximately 40,000 DNA sequences. For each protein, we used five folds of 5,000 training sequences and 20,000 testing sequences. For each of the four algorithms (CCCP, SPL, SPL-Uncertainty, and SPL-Novelty) and each fold, we did two runs with different random initializations of the motif positions. These initializations were the same across the four algorithms. We use the better of the two initializations, as judged by final value of the objective function, when reporting results for a given protein, fold, and algorithm. 
 
