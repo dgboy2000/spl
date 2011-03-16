@@ -148,11 +148,10 @@ f(\bf x, \bf y; \bf w) &=& \sum_{\bf\tilde{h}} \bf\tilde p({\tilde h}) \log\bf\t
 \end{eqnarray}
 See sections (\ref{sec:implementation}) and (\ref{sec:futureWork}) about the sigmoid's midpoint $z_0$ and width $k$.
 
-If we interpret the sigmoid of the score of hidden variable $\bf \hat h$ as a probability, $\bf\tilde p(\bf \hat h)$, then the uncertainty has a natural interpretation as the entropy of the motif location.  We hypothesize that training first on examples on which we are confident of the hidden variable will encode a better hidden variable model in the parameters $\bf w$.
-
+If we interpret $\bf\tilde p(\bf h)$, the normalized sigmoid function of the score for hidden variable $\bf h$, as a probability, then the uncertainty has a natural interpretation as the entropy of the distribution over hidden variable values. We hypothesized that using the uncertainty criterion would prevent us from attempting to learn $\bf w$ from examples in which we have imputed the wrong hidden variable value, thereby allowing us to learn a better set of parameters $\bf w$. 
 
 \subsection{Novelty}
-Our second intuition is that we should train on examples in the order in which they are easiest to \emph{learn}.  The slack $\xi_i$ represents the extent to which a point violates our \emph{current knowledge}, $\bf w$.  Even if $\xi_i$ is big, it may be possible to make a small change to $\bf w$ to \emph{learn} this point and send $\xi$ to zero.  With this intuition, we define the \textbf{Novelty} of an example $(\bf x, \bf y)$ to a parameter vector $\bf w$ as follows:
+Our second intuition was that we should train on examples in the order in which they are easiest to \emph{learn}.  The slack $\xi_i$ represents the extent to which a point violates our \emph{current knowledge}, $\bf w$.  Even if $\xi_i$ is big, it may be possible to make a small change to $\bf w$ to \emph{learn} this point and send the slack $\xi_i$ to zero.  With this intuition, we define the \textbf{Novelty} of an example $(\bf x, \bf y)$ to a parameter vector $\bf w$ as follows:
 
 \begin{eqnarray}
 f(\bf x, \bf y; \bf w) &=&\min_{\Delta w} \frac{1}{2}||{\Delta\bf w}||^2, \nonumber \\
@@ -163,21 +162,54 @@ f(\bf x, \bf y; \bf w) &=&\min_{\Delta w} \frac{1}{2}||{\Delta\bf w}||^2, \nonum
 &&\forall \hat{\bf y} \in {\cal Y}, \forall \hat{h} \in {\cal H}, i=1,\cdots,n.
 \end{eqnarray}
 
-Intuitively, $\Delta w$ is the smallest change we have to make to $\bf w$ in order to correctly classify $x$ with slack 0.  
+Intuitively, $\Delta w$ is the smallest change we have to make to $\bf w$ in order to correctly classify $\bf x$ with slack 0.  
 
 TODO: write a hypothesis here that parallels the uncertainty hypo
 
-We implemented uncertainty- and novelty-based selection criteria, analyzed their performance, and compared the results to CCCP \cite{SSVM} and slack-based SPL \cite{SPL}.
+We implemented these uncertainty- and novelty-based selection criteria, analyzed their performance, and compared the results to CCCP \cite{SSVM} and slack-based SPL \cite{SPL}.
 
 \mysection{Implementation}
 \label{sec:implementation}
 We chose to test our criteria on the problem of identifying motifs in protein sequences.  This problem has been studied for both latent SSVM \cite{SSVM} and SPL \cite{SPL}, so it was a natural starting point to evaluate new criteria.
+=======
+Now that we have described the general concepts behind our uncertainty- and novelty-based selection criteria, we go into the details of their implementation.
 
-We modified the SPL code from \cite{SPL} to simulate our new objectives. The existing code solved the SPL problem using an outer loop for hidden variable computation and an inner loop for parameter updates and sample inclusion using Alternate Convex Search ({\sc ACS}) \cite{SPL} and the Constrained Concave-Convex Procedure ({\sc CCCP}) \cite{SSVM}.
+%We now describe the implementation of the uncertainty- and novelty-based selection criteria.
 
+%We implemented uncertainty- and novelty-based selection criteria, analyzed their performance, and compared the results to CCCP \cite{SSVM} and slack-based SPL \cite{SPL}.
+
+\mysection{Implementation}
+\label{sec:Implementation}
+%We chose to test our criteria on the problem of identifying motifs in protein sequences.  This problem has been studied for both latent SSVM \cite{SSVM} and SPL \cite{SPL}, so it was a natural starting point to evaluate new criteria.
+
+We extended the SPL code from \cite{SPL} to implement our new methods. The existing code solved the SPL problem using an outer loop for hidden variable computation and an inner loop for parameter updates and sample inclusion, as described in CITE ALG.
+>>>>>>> 27d3a5db6ad40cb6290460e4519fdf5ce97529ef
+
+%move the acs and cccp part below to next paragraph (in middle of doing)
+ %using Alternate Convex Search ({\sc ACS}) \cite{SPL} and the Constrained Concave-Convex Procedure ({\sc CCCP}) \cite{SSVM}.
+
+<<<<<<< HEAD
 The outer loop alternates between choosing the best hidden variable for each example and optimizing the parameters \& selected examples.  Each successive iteration through the outer loop lowers the easiness barrier for including samples, until all samples are included.
+=======
+\begin{algorithm}[h!]
+\mytopcaption{Outer Loop: The self-paced learning algorithm for parameter estimation of latent {\sc ssvm}.}
+\label{algo:selfPacedLatentSSVM}
+\begin{algorithmic}[1]
+\INPUT ${\cal D} = \{({\bf x}_1,{\bf y}_1),\cdots,({\bf x}_n,{\bf y}_n)\}$, ${\bf w}_0$, $K_0$, $\epsilon$, $\mu$.
+\STATE $t \leftarrow 0$, $K \leftarrow K_0$.
+\REPEAT
+\STATE Update $h_i^* = \argmax_{h_i \in {\cal H}} {\bf w}_{t}^\top \Phi({\bf x}_i,{\bf y}_i,{\bf h}_i)\ \forall i$.
+\STATE Update ${\bf w}_{t+1}$ by using {\sc acs} to minimize the objective
+$\frac{1}{2}||{\bf w}||^2 + \frac{C}{n} \sum_{i=1}^n v_i\xi_i$ subject to the contraints in~(\ref{eq:latentSSVM}) and $v_i=I\left\{f({\bf x_i,\bf y_i;\bf w}) < \frac{1}{K}\right\}$.
+\STATE $t \leftarrow t + 1$, $K \leftarrow K/\mu$.
+\UNTIL{$v_i = 1\ \forall i$ and the objective function cannot be decreased below tolerance $\epsilon$.}
+\end{algorithmic}
+\end{algorithm}
 
-The parameter-estimation-and-sample-inclusion step is executed by an inner loop that alternates between selecting the currently active samples and updating the parameters ({\sc ACS}).  The parameter update step is a latent SSVM is solved using the {\sc CCCP} algorithm \cite{SSVM}, which alternates between finding the most violated constraint (the concave part):
+The outer loop alternates between choosing the best hidden variable for each example and optimizing the parameters and selected examples.  Each successive iteration through the outer loop lowers the easiness barrier for including samples, until all samples are included.
+>>>>>>> 27d3a5db6ad40cb6290460e4519fdf5ce97529ef
+
+The parameter-estimation-and-sample-inclusion step is executed by an inner loop that alternates between selecting the currently active samples and updating the parameters ({\sc ACS}).  The parameter update step is a latent SSVM that is solved using the {\sc CCCP} algorithm \cite{SSVM}, which alternates between finding the most violated constraint (the concave part):
 \mthb
 {\bf\bar y_i,\bf\bar h_i} = \argmax_{{\bf\hat y_i},{\bf\hat h_i}} \Delta({\bf y_i,\bf\hat y_i})+{\bf w}^\top\Phi(\bf x_i,\bf\hat y_i,\bf\hat h_i)
 \mthe
