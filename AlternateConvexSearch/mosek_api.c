@@ -67,11 +67,9 @@ test_mosek1()
   
   for (i=0; i<n; ++i)
     {
-      A[i] = malloc (sizeof (double *) * n);
-      for (j=0; j<n; ++j)
-        {
-          A[i][j] = i==j?-1:0; /* A is the negative identity matrix. */
-        }
+      /* A is the negative identity matrix. */
+      A[i] = calloc (n, sizeof (double));
+      A[i][i] = -1;
       
       ones[i] = 1;
     }
@@ -640,13 +638,13 @@ compute_qp_params (double *phi_h_star, /* \Phi(x, y, h_star) */
         {
           for (i=0; i<num_pairs; ++i)
             {
-              printf("%i pair, %i feature component of non-sparse matrix: %d\n", i, j, phi_y_h_hat[i][j]);
+              printf("%i pair, %i feature component of non-sparse matrix: %f\n", i, j, phi_y_h_hat[i][j]);
             }
         }
         
       for (j=0; j<num_features; ++j)
         {
-          printf("%i feature component of phi_hat: %d\n", j, phi_h_star[j]);
+          printf("%i feature component of phi_hat: %f\n", j, phi_h_star[j]);
         }
       
     }
