@@ -6,8 +6,14 @@ else
 if [ $HOME == "/home/kevin" ]; then
   export MOSEK_ROOT=$HOME/Sites/cs228/mosek/6/tools/platform/linux32x86  
   export MOSEK_VERSION=mosek
+else
+  
+if [ $HOME == "/afs/ir/users/k/j/kjmiller" ]; then
+  export MOSEK_ROOT=$HOME/Sites/cs228/mosek/6/tools/platform/linux64x86  
+  export MOSEK_VERSION=mosek64
 fi
-
+  
+fi
 fi
 
 
