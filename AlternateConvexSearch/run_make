@@ -1,0 +1,11 @@
+if [ $HOME == "/Users/dannygoodman" ]; then
+  export MOSEK_ROOT=$HOME/Sites/cs228/mosek/6/tools/platform/osx64x86
+else
+  
+if [ $HOME == "/home/kevin" ]; then
+  export MOSEK_ROOT=$HOME/Sites/cs228/mosek/6/tools/platform/linux32x86  
+fi
+
+fi
+
+make
