@@ -312,6 +312,31 @@ void classify_struct_example(PATTERN x, LABEL *y, LATENT_VAR *h, STRUCTMODEL *sm
   }
 }
 
+
+// Assuming the y=-1 label has score 0, compute the relative scores of the y=1 hidden variable locations
+static void
+find_argmax_hbar (PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, double *max_score, int *max_pos) {
+  double score;
+  int *pattern_hash, j, h;
+  
+  pattern_hash = sm->pattern_hash[x.example_id];
+  
+  *max_score = -1E10;
+  *max_pos = -1;
+  
+  for (h=0;h<x.length-sparm->motif_length-sparm->bg_markov_order;h++) {
+    score = 0.0;
+    for (j=h; j<h+sparm->motif_length; j++) {
+      score += sm->w[sm->sizePsi-(4*(j-h)+base2int(x.sequence[j]))];
+      score -= sm->w[1+pattern_hash[j]];
+    }
+    if (score>*max_score) {
+      *max_score = score;
+      *max_pos = h;
+    }
+  }
+}
+
 void find_most_violated_constraint_marginrescaling(PATTERN x, LABEL y, LABEL *ybar, LATENT_VAR *hbar, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
 //
 //  Finds the most violated constraint (loss-augmented inference), i.e.,
@@ -319,25 +344,12 @@ void find_most_violated_constraint_marginrescaling(PATTERN x, LABEL y, LABEL *yb
 //  The output (ybar,hbar) are stored at location pointed by 
 //  pointers *ybar and *hbar. 
 //
-  double max_score, score;
-  int *pattern_hash, max_pos,j,h;
+  double max_score;
+  int max_pos;
 
-  pattern_hash = sm->pattern_hash[x.example_id];
-  
-  max_score = -1E10;
-  max_pos = -1;
-  for (h=0;h<x.length-sparm->motif_length-sparm->bg_markov_order;h++) {
-    score = 0.0;
-    for (j=h;j<h+sparm->motif_length;j++) {
-      score += sm->w[sm->sizePsi-(4*(j-h)+base2int(x.sequence[j]))];
-      score -= sm->w[1+pattern_hash[j]];
-    }
-    if (score>max_score) {
-      max_score = score;
-      max_pos = h;
-    }
-  }
+  find_argmax_hbar (x, sm, sparm, &max_score, &max_pos);
 
+  // most-violated constraint allowing y-bar to equal y
   // zero-one loss
   if (y.label==1) {
     if (max_score>1.0) { 
@@ -355,9 +367,39 @@ void find_most_violated_constraint_marginrescaling(PATTERN x, LABEL y, LABEL *yb
       ybar->label = -1;
       hbar->position = -1;
     }
-
   }
   
+  // most-violated constraint allowing y-bar to equal y
+  // zero-one loss
+  
+  ybar->label = -1 * y.label;
+  if (ybar->label == 1) {
+    hbar->position = max_pos;
+  } else {
+    hbar->position = -1;
+  }
+  
+}
+
+void find_most_violated_constraint_oppositey(PATTERN x, LABEL y, LABEL *ybar, LATENT_VAR *hbar, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+//
+//  Finds the most violated constraint (loss-augmented inference), 
+//  given that ybar must be different than y i.e.,
+//  computing argmax_{(ybar,hbar)} [<w,psi(x,ybar,hbar)> + loss(y,ybar,hbar)].
+//  The output (ybar,hbar) are stored at location pointed by 
+//  pointers *ybar and *hbar. 
+//
+  double max_score;
+  int max_pos;
+
+  ybar->label = -1 * y.label;
+  if (ybar->label == 1) {
+    find_argmax_hbar(x, sm, sparm, &max_score, &max_pos);
+    hbar->position = max_pos;
+  } else {
+    hbar->position = -1;
+  }
+
 }
 
 int get_num_latent_variable_options(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
