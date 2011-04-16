@@ -10,30 +10,11 @@ LDFLAGS= -g
 #LDFLAGS = -O3 -pg
 LIBS= -lm
 
-# sub define_mosek {
-# use Config;
-#     
-# $ARCH = $Config{'archname'};    # Use perl's knowledge of the architecture.
-# 
-# if ($ARCH =~ /linux/) { # This is Kevin's Path
-# 	$MOSEK_ROOT = "/home/kevin/Sites/cs228/mosek/6/tools/platform/linux32x86";
-# } else if ($ARCH =~ /darwin/) { # This is Danny's Path
-# 	$MOSEK_ROOT = "${HOME}/Sites/cs228/mosek/6/tools/platform/osx64x86";
-# } else {
-# 	die "Unknown architecture '$ARCH'";
-# }
-# 
-# }
-
-# echo "This is a command"
-
+# NOTES: the following variables rely on environment variables that must be defined elsewhere
 MOSEK_H= $(MOSEK_ROOT)/h
 MSKLIBPATH= $(MOSEK_ROOT)/bin
+MSKLINKFLAGS= -l$(MOSEK_VERSION) -lpthread -lm
 
-
-#MSKLINKFLAGS= -lirc -lguide -limf -lsvml -lunwind -lmosek64 -lpthread -lc -ldl -lm
-MSKLINKFLAGS= -lmosek64 -lpthread -lm
-# MSKLIBPATH= /afs/cs.stanford.edu/u/pawan/Project/mosek/6/tools/platform/linux64x86/bin/
 SFMTPATH= ./SFMT-src-1.3.3
 
 all: test_mosek svm_motif_learn svm_motif_classify
