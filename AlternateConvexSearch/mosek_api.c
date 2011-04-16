@@ -634,6 +634,23 @@ compute_qp_params (double *phi_h_star, /* \Phi(x, y, h_star) */
   int nz_ind = 0;
   double *tmp_vector;
   
+  if (debug)
+    {
+      for (j=0; j<num_features; ++j)
+        {
+          for (i=0; i<num_pairs; ++i)
+            {
+              printf("%i pair, %i feature component of non-sparse matrix: %d\n", i, j, phi_y_h_hat[i][j]);
+            }
+        }
+        
+      for (j=0; j<num_features; ++j)
+        {
+          printf("%i feature component of phi_hat: %d\n", j, phi_h_star[j]);
+        }
+      
+    }
+  
   /* Compute sparse constraint matrix. The (i,j)-th entry is the j-th component
     of the i-th pair's feature vector diff. */
   for (j=0; j<num_features; ++j)
