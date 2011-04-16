@@ -13,7 +13,7 @@ LIBS= -lm
 # NOTES: the following variables rely on environment variables that must be defined elsewhere
 MOSEK_H= $(MOSEK_ROOT)/h
 MSKLIBPATH= $(MOSEK_ROOT)/bin
-MSKLINKFLAGS= -l$(MOSEK_VERSION) -lpthread -lm
+MSKLINKFLAGS= -l$(MOSEK_VERSION) -liomp5 -lpthread -lm
 
 SFMTPATH= ./SFMT-src-1.3.3
 

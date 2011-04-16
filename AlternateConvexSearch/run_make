@@ -5,11 +5,10 @@ else
   
 if [ $HOME == "/home/kevin" ]; then
   export MOSEK_ROOT=$HOME/Sites/cs228/mosek/6/tools/platform/linux32x86  
-  export MOSEK_VERSION=mose
+  export MOSEK_VERSION=mosek
 fi
 
 fi
 
-mosek64
 
 make
