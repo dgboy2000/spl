@@ -1,0 +1,19 @@
+# Theirs
+./svm_motif_learn -c 150 -k 0 -m 1.3 --s 0000 data/train001_1.data motif.model motif # NOT SELF-PACED
+./svm_motif_learn -c 150 -k 100 -m 1.3 --s 0000 data/train001_1.data motif.model motif # SELF-PACED
+
+# Danny's
+./svm_motif_learn -c 150 -k 0 -m 1.3 --s 0000 data/train001_1.data motif.model motif
+./svm_motif_learn -c 150 -k 100 -m 1.3 -f 0.5 -v 0.5 --s 0000 data/train131_1.data motif.model motif
+
+# Learning
+./svm_motif_learn -c 150 -k 100 -m 1.3 -f 0.5 -v 0.5 --s 0000 ../small.data motif.model motif # Small data
+
+# Inference
+./svm_motif_classify ../small.data motif.model motif.testerror
+
+
+# Pipelining with a script:
+-script submits a batch of learning jobs with specified params, and data sets, folds, random seeds. script puts everything from the same run in a single directory, with a file containing the run parameters, and description of the run
+-then, run inference jobs; farm out an inference job to the same machine as a learning job. maybe use screen to persist the sessions? run inference on both the training and test datasets.
+-third phase: gather all the result files (test error/train error will be in files with just one number, the error rate; objective value will be in .time files: objective, time for run)

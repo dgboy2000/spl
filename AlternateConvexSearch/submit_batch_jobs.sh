@@ -8,7 +8,7 @@
 
 proteins=( '052' '074' '108' '131' '146' )
 folds=( 1 2 3 4 5 )
-seeds=( '0000' '0001' )
+seeds=( '0000' '0001' '0002' '0003' )
 
 MAX_MYTH=16
 myth=1
@@ -30,7 +30,7 @@ do
       if [ $myth -gt $MAX_MYTH ]
       then
         myth=1
-        echo "Recycling to myth machine 1 from $MAX_MYTH"
+        echo "# Recycling to myth machine 1 from $MAX_MYTH"
       fi
       
     done
