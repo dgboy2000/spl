@@ -3,6 +3,7 @@
 # -third phase: gather all the result files (test error/train error will be in files with just one number, the error rate; objective value will be in .time files: objective, time for run)
 
 import datetime
+import math
 import os
 import sys
 
@@ -77,10 +78,24 @@ for alg_name,param_pair in params['param_pairs'].iteritems():
         cur_job[seed] = [training_job, training_inference_job, test_inference_job]
 
 
+def mean(a):
+  return sum(a) / float(len(a))
+  
+def var(a):
+  n = len(a)
+  a2 = [x*x for x in a]
+  return sum(a2 / n) - sum(a / n)**2
 
 # Run the jobs
+stats = {}
+summary_stats = []
 for alg_name, alg_jobs in jobs.iteritems():
+  ALG_ROOT = RUN_ROOT+'/'+alg_name
+  stats[alg_name] = {}
+  alg_stats = stats[alg_name]
+  
   for prot, prot_jobs in alg_jobs.iteritems():
+    prot_stats = {'train' : [], 'test' : []}
     for fold, fold_jobs in prot_jobs.iteritems():
       for seed, seed_jobs in fold_jobs.iteritems():
         
@@ -89,6 +104,54 @@ for alg_name, alg_jobs in jobs.iteritems():
         
         status = os.system(job_cmd)
         if status:
-          print "COMMAND FAILED!"
+          print "COMMAND FAILED: "+job_cmd
+          continue
+          
+        training_basename = '%s/motif%s_%d_%s' %(ALG_ROOT, prot, fold, seed)
+        training_error_file = '%s.error.train' %training_basename
+        test_error_file = '%s.error.test' %training_basename
+        prot_stats['train'].append(float(open(training_error_file, 'r').read()))
+        prot_stats['test'].append(float(open(test_error_file, 'r').read()))
+        
+    summary_stats.append("Stats for protein %s:" %prot)
+    summary_stats.append("Training: n %d, mean %f, stdev %f" %(len(prot_stats['train']), mean(prot_stats['train']), math.sqrt(var(prot_stats['train']))))
+    summary_stats.append("Test: n %d, mean %f, stdev %f" %(len(prot_stats['test']), mean(prot_stats['test']), math.sqrt(var(prot_stats['test']))))
+    alg_stats[prot] = prot_stats
 
+print "\n".join(summary_stats)
+stats_filename = RUN_ROOT+'/STATS'
+STATS_FILE = open(stats_filename, 'w')
+STATS_FILE.write("\n".join(summary_stats))
+STATS_FILE.write(str(stats))
+STATS_FILE.close()
+        
+
+# def is_error_filename(filename):
+#   if len(filename) < 12:
+#     return false
+#   if filename[-12:] == '.error.train' or filename[-11:] == '.error.test':
+#     return true
+#   return false
+# 
+# # Summarize the results
+# for filename in os.listdir(RUN_ROOT):
+#   alg_dir = RUN_ROOT+'/'+filename
+#   if os.path.isdir(alg_dir):
+#     alg_files = os.listdir(alg_dir)
+#     for alg_file in alg_files:
+#       if not is_error_filename(alg_file):
+#         continue
+#       
+#       error = open(alg_file, 'r').read()
+#       
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 
