@@ -40,19 +40,19 @@ README_FILE.close()
 jobs = {}
 for alg_name,param_pair in params['param_pairs'].iteritems():
   jobs[alg_name] = {}
-  cur_job = jobs[alg_name]
+  alg_jobs = jobs[alg_name]
   
   ALG_ROOT = RUN_ROOT+'/'+alg_name
   if not os.path.exists(ALG_ROOT):
     os.mkdir(ALG_ROOT)
   
   for prot in params['proteins']:
-    cur_job[prot] = {}
-    cur_job = cur_job[prot]
+    alg_jobs[prot] = {}
+    prot_jobs = alg_jobs[prot]
     
     for fold in params['folds']:
-      cur_job[fold] = {}
-      cur_job = cur_job[fold]
+      prot_jobs[fold] = {}
+      seed_jobs = prot_jobs[fold]
       
       for seed in params['seeds']:
         
@@ -75,16 +75,16 @@ for alg_name,param_pair in params['param_pairs'].iteritems():
         test_inference_job = "./svm_motif_classify %s %s %s"\
           %(test_data, training_model, test_error_file)
 
-        cur_job[seed] = [training_job, training_inference_job, test_inference_job]
+        seed_jobs[seed] = [training_job, training_inference_job, test_inference_job]
 
 
 def mean(a):
   return sum(a) / float(len(a))
   
 def var(a):
-  n = len(a)
+  n = float(len(a))
   a2 = [x*x for x in a]
-  return sum(a2 / n) - sum(a / n)**2
+  return sum(a2) / n - sum(a)**2 / n**2
 
 # Run the jobs
 stats = {}
@@ -99,7 +99,10 @@ for alg_name, alg_jobs in jobs.iteritems():
     for fold, fold_jobs in prot_jobs.iteritems():
       for seed, seed_jobs in fold_jobs.iteritems():
         
-        job_cmd = ' && '.join(seed_jobs)
+        try:
+          job_cmd = ' && '.join(seed_jobs)
+        except TypeError:
+          import pdb; pdb.set_trace()
         print "Executing the following command: %s\n" %job_cmd
         
         status = os.system(job_cmd)
