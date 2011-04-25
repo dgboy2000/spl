@@ -1,2 +1,3 @@
 mosek*
+!mosek_qp_optimize.*
 AlternateConvexSearch/data
