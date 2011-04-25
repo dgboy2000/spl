@@ -23,6 +23,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <math.h>
+#include "debug.h"
 #include "svm_struct_latent_api.h"
 #include "./svm_light/svm_learn.h"
 
@@ -444,6 +445,9 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
   printf("Running structural SVM solver: "); fflush(stdout); 
 
 	new_constraint = find_cutting_plane(ex, fycache, &margin, m, sm, sparm, valid_examples);
+	printf ("Found the following constraint:\n");
+  print_svec (new_constraint);
+	
  	value = margin - sprod_ns(w, new_constraint);
 	while((value>threshold+epsilon)&&(iter<MAX_ITER)) {
 		iter+=1;

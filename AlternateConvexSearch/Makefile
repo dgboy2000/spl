@@ -23,7 +23,7 @@ clean:
 	rm -f *.o
 	rm -f svm_motif_learn svm_motif_classify test_mosek
 
-svm_motif_learn: svm_struct_latent_spl.o svm_common.o mosek_qp_optimize.o svm_struct_latent_api.o SFMT.o mosek_api.o
+svm_motif_learn: svm_struct_latent_spl.o svm_common.o mosek_qp_optimize.o svm_struct_latent_api.o SFMT.o mosek_api.o debug.o
 	$(LD) $(LDFLAGS) svm_struct_latent_spl.o svm_common.o mosek_qp_optimize.o mosek_api.o SFMT.o svm_struct_latent_api.o -o svm_motif_learn $(LIBS) -L$(MSKLIBPATH) $(MSKLINKFLAGS)
 
 svm_motif_classify: svm_struct_latent_classify.o svm_common.o svm_struct_latent_api.o SFMT.o
@@ -43,6 +43,9 @@ test_mosek.o: test_mosek.c
 
 mosek_api.o: mosek_api.c
 	$(CC) -c $(CFLAGS) mosek_api.c -o mosek_api.o -I $(MOSEK_H)
+
+debug.o: debug.c debug.h
+	$(CC) -c $(CFLAGS) debug.c -o debug.o
 
 mosek_qp_optimize.o: mosek_qp_optimize.c
 	$(CC) -c $(CFLAGS) mosek_qp_optimize.c -o mosek_qp_optimize.o -I $(MOSEK_H)
