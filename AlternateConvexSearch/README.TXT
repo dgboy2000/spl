@@ -1,3 +1,6 @@
+Make with ./run_make
+
+
 Code for Discriminative Motif Finding, implemented using the Latent Structural SVM API (June 4 2009)
 ----------------------------------------------------------------------------------------------------
 (implemented by Chun-Nam Yu based on the SVM-light code by Thorsten Joachims)
