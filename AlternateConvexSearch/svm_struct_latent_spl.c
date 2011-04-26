@@ -199,6 +199,7 @@ SVECTOR* find_cutting_plane(EXAMPLE *ex, SVECTOR **fycache, double *margin, long
 		}
 
     (*find_most_violated_constraint_func)(ex[i].x, ex[i].y, &ybar, &hbar, sm, sparm);
+    // printf ("Most violated constraint %d is (y, h) = (%d, %d)\n", i, ybar.label, hbar.position);
     /* get difference vector */
     fy = copy_svector(fycache[i]);
     fybar = psi(ex[i].x,ybar,hbar,sm,sparm);
@@ -450,8 +451,8 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
 
 	new_constraint = find_cutting_plane(ex, fycache, &margin, m, sm, sparm, valid_examples);
   
-  printf ("Found the following constraint:\n");
-  print_svec (new_constraint);
+  // printf ("Found the following first constraint:\n");
+  // print_svec (new_constraint);
   
  	value = margin - sprod_ns(w, new_constraint);
 	while((value>threshold+epsilon)&&(iter<MAX_ITER)) {
@@ -571,6 +572,9 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
 			threshold = 0.0;
 
  		new_constraint = find_cutting_plane(ex, fycache, &margin, m, sm, sparm, valid_examples);
+    // printf ("Found the following constraint %d:\n", iter);
+    //     print_svec (new_constraint);
+ 		
    	value = margin - sprod_ns(w, new_constraint);
 
 		if((iter % CLEANUP_CHECK) == 0)
@@ -1161,6 +1165,14 @@ int main(int argc, char* argv[]) {
 
   /* impute latent variable for first iteration */
   init_latent_variables(&sample,&learn_parm,&sm,&sparm);
+
+  // {
+  // int i;
+  // for (i=0; i<sm.sizePsi; ++i)
+  //   {
+  //     printf ("h[%d] = %d", i, sample.examples[i].h.position);
+  //   }
+  // }
 
   /* prepare feature vector cache for correct labels with imputed latent variables */
   fycache = (SVECTOR**)malloc(m*sizeof(SVECTOR*));

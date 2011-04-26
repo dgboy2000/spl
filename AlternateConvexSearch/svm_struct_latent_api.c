@@ -369,16 +369,6 @@ void find_most_violated_constraint_marginrescaling(PATTERN x, LABEL y, LABEL *yb
     }
   }
   
-  // most-violated constraint allowing y-bar to equal y
-  // zero-one loss
-  
-  ybar->label = -1 * y.label;
-  if (ybar->label == 1) {
-    hbar->position = max_pos;
-  } else {
-    hbar->position = -1;
-  }
-  
 }
 
 void find_most_violated_constraint_oppositey(PATTERN x, LABEL y, LABEL *ybar, LATENT_VAR *hbar, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
