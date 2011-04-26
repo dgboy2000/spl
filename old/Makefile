@@ -23,7 +23,7 @@ MSKLIBPATH=$(MOSEK_ROOT)/bin
 
 SFMTPATH= ./SFMT-src-1.3.3
 
-all: svm_motif_learn svm_motif_classify
+all: svm_motif_learn svm_motif_classify generate_test_dataset
 
 clean: 
 	rm -f *.o
@@ -34,6 +34,12 @@ svm_motif_learn: svm_struct_latent_spl.o svm_common.o mosek_qp_optimize.o svm_st
 
 svm_motif_classify: svm_struct_latent_classify.o svm_common.o svm_struct_latent_api.o SFMT.o debug.o
 	$(LD) $(LDFLAGS) svm_struct_latent_classify.o svm_common.o SFMT.o svm_struct_latent_api.o -o svm_motif_classify $(LIBS)
+
+generate_test_dataset: generate_test_dataset.o
+	$(LD) $(LDFLAGS) generate_test_dataset.o -o generate_test_dataset
+
+generate_test_dataset.o: generate_test_dataset.c
+	$(CC) -std=c99 -c $(CFLAGS) generate_test_dataset.c -o generate_test_dataset.o
 
 svm_struct_latent_spl.o: svm_struct_latent_spl.c
 	$(CC) -std=c99 -c $(CFLAGS) svm_struct_latent_spl.c -o svm_struct_latent_spl.o
