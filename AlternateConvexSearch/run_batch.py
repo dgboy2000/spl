@@ -10,6 +10,12 @@ import sys
 assert len(sys.argv) == 2, "Correct usage is python run_batch.py [params file]"
 execfile(sys.argv[1])
 
+make_cmd = "make clean && ./run_make"
+status = os.system(make_cmd)
+if status:
+  print "MAKE COMMAND FAILED: "+make_cmd
+  sys.exit(1)
+
 # generate a directory that will hold all output for this run
 extension = params['extension']
 if extension == 'datetime':
