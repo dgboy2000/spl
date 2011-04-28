@@ -1,10 +1,8 @@
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
 #include <string.h>
-
 
 void randomly_select_and_write(char ** all_datapoints, int num_datapoints,int num_to_select, FILE * ofp) {
   int num_slots_available = num_to_select;
@@ -25,7 +23,7 @@ int is_positive(char * datapoint) {
   return (*(strchr(datapoint, (int)(':')) + 1) != '-');
 }
 
-void get_all_datapoints(FILE * ifp, char *** all_neg_datapoints, char *** all_pos_datapoints, int * num_neg_datapoints, int * num_pos_datapoints) {
+void get_all_datapoints(FILE * ifp, char *** all_neg_datapoints, char ***all_pos_datapoints, int * num_neg_datapoints, int* num_pos_datapoints, int max_line_length) {
   int num_total_datapoints;
   fscanf(ifp, "%d\n", &num_total_datapoints);
   *all_neg_datapoints = calloc(num_total_datapoints, sizeof(char*));
@@ -34,9 +32,8 @@ void get_all_datapoints(FILE * ifp, char *** all_neg_datapoints, char *** all_po
   *num_pos_datapoints = 0;
   int i;
   for (i = 0; i < num_total_datapoints; i++) {
-    size_t line_length = 0;
-    char * datapoint = NULL;
-    getline(&datapoint, &line_length, ifp); //getline should malloc datapoint
+    char * datapoint = malloc(max_line_length + 1);
+    fscanf(ifp, "%s\n", datapoint);
     if (is_positive(datapoint)) {
       (*all_pos_datapoints)[*num_pos_datapoints] = datapoint;
       (*num_pos_datapoints)++;
@@ -48,15 +45,16 @@ void get_all_datapoints(FILE * ifp, char *** all_neg_datapoints, char *** all_po
 }
 
 int main(int argc, char * argv[]) {
-  if (argc != 6) {
-    printf("I want 5 arguments - name of file to read in, number of negative datapoints to select, number of positive datapoints to select, seed for RNG, and file to write out to.\n");
+  if (argc != 7) {
+    printf("I want 6 arguments - name of file to read in, maximum line length, number of negative datapoints to select, number of positive datapoints to select, seed for RNG, and file to write out to.\n");
     return 1;
   }
   char * in_filename = argv[1];
-  int num_neg_to_select = atoi(argv[2]);
-  int num_pos_to_select = atoi(argv[3]);
-  int rand_seed = atoi(argv[4]);
-  char * out_filename = argv[5];
+  int max_line_length = atoi(argv[2]);
+  int num_neg_to_select = atoi(argv[3]);
+  int num_pos_to_select = atoi(argv[4]);
+  int rand_seed = atoi(argv[5]);
+  char * out_filename = argv[6];
   FILE * ifp = fopen(in_filename, "r");
   FILE * ofp = fopen(out_filename, "w");
   assert(ifp != NULL);
@@ -66,7 +64,7 @@ int main(int argc, char * argv[]) {
   int num_pos_datapoints = 0;
   char ** all_neg_datapoints = NULL;
   char ** all_pos_datapoints = NULL;
-  get_all_datapoints(ifp, &all_neg_datapoints, &all_pos_datapoints, &num_neg_datapoints, &num_pos_datapoints);
+  get_all_datapoints(ifp, &all_neg_datapoints, &all_pos_datapoints, &num_neg_datapoints, &num_pos_datapoints, max_line_length);
   if (num_neg_to_select > num_neg_datapoints || num_pos_to_select > num_pos_datapoints) {
     printf("There either aren't enough negative datapoints or enough positive datapoints.\n");
     return 1;
