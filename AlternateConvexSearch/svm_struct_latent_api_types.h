@@ -101,5 +101,6 @@ typedef struct struct_learn_parm {
   double novelty_weight;
   int print_extensive;
   int reduced_size;
+  int margin_type;
 } STRUCT_LEARN_PARM;
 

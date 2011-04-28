@@ -44,7 +44,14 @@
 #define DEBUG_LEVEL 0
 
 
-void (*find_most_violated_constraint_func)(PATTERN x, LABEL y, LABEL *ybar, LATENT_VAR *hbar, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
+void find_most_violated_constraint(PATTERN x, LABEL y, LABEL *ybar, LATENT_VAR *hbar, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+  switch (sparm->margin_type) {
+    case 0: find_most_violated_constraint_marginrescaling (x, y, ybar, hbar, sm, sparm); break;
+    case 1: find_most_violated_constraint_oppositey (x, y, ybar, hbar, sm, sparm); break;
+    default: printf ("Unrecognized margin_type '%d'\n", sparm->margin_type);
+    exit(1);
+  }
+}
 
 int mosek_qp_optimize(double**, double*, double*, long, double, double*);
 
@@ -115,7 +122,7 @@ double current_obj_val(EXAMPLE *ex, SVECTOR **fycache, long m, STRUCTMODEL *sm, 
   for (i=0;i<m;i++) {
 		if(!valid_examples[i])
 			continue;
-    (*find_most_violated_constraint_func)(ex[i].x, ex[i].y, &ybar, &hbar, sm, sparm);
+    find_most_violated_constraint(ex[i].x, ex[i].y, &ybar, &hbar, sm, sparm);
     /* get difference vector */
     fy = copy_svector(fycache[i]);
     fybar = psi(ex[i].x,ybar,hbar,sm,sparm);
@@ -198,7 +205,7 @@ SVECTOR* find_cutting_plane(EXAMPLE *ex, SVECTOR **fycache, double *margin, long
 			continue;
 		}
 
-    (*find_most_violated_constraint_func)(ex[i].x, ex[i].y, &ybar, &hbar, sm, sparm);
+    find_most_violated_constraint(ex[i].x, ex[i].y, &ybar, &hbar, sm, sparm);
     // printf ("Most violated constraint %d is (y, h) = (%d, %d)\n", i, ybar.label, hbar.position);
     /* get difference vector */
     fy = copy_svector(fycache[i]);
@@ -352,7 +359,7 @@ double stochastic_subgradient_descent(double *w, long m, int MAX_ITER, double C,
 
 		for(i=0;i<subset_size;i++) {
 			/* find subgradient */
-   		(*find_most_violated_constraint_func)(ex[valid_indices[perm[i]]].x, ex[valid_indices[perm[i]]].y, &ybar, &hbar, sm, sparm);
+   		find_most_violated_constraint(ex[valid_indices[perm[i]]].x, ex[valid_indices[perm[i]]].y, &ybar, &hbar, sm, sparm);
    		lossval = loss(ex[valid_indices[perm[i]]].y,ybar,hbar,sparm);
    		fy = copy_svector(fycache[valid_indices[perm[i]]]);
    		fybar = psi(ex[valid_indices[perm[i]]].x,ybar,hbar,sm,sparm);
@@ -643,7 +650,7 @@ int check_acs_convergence(int *prev_valid_examples, int *valid_examples, long m)
 		penalty = DBL_MAX;
 
 	for (i=0;i<m;i++) {
-		(*find_most_violated_constraint_func)(ex[i].x, ex[i].y, &ybar, &hbar, sm, sparm);
+		find_most_violated_constraint(ex[i].x, ex[i].y, &ybar, &hbar, sm, sparm);
 		fy = copy_svector(fycache[i]);
 		fybar = psi(ex[i].x,ybar,hbar,sm,sparm);
 		slack[i].index = i;
@@ -782,7 +789,7 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
 	SVECTOR *f, *fy, *fybar;
 
 	for (i=0;i<m;i++) {		
-		(*find_most_violated_constraint_func)(ex[i].x, ex[i].y, &ybar, &hbar, sm, sparm);
+		find_most_violated_constraint(ex[i].x, ex[i].y, &ybar, &hbar, sm, sparm);
 		fy = copy_svector(fycache[i]);
 		fybar = psi(ex[i].x,ybar,hbar,sm,sparm);
 		exampleScores[i].index = i;
@@ -1076,10 +1083,6 @@ double compute_current_loss(SAMPLE val, STRUCTMODEL *sm, STRUCT_LEARN_PARM *spar
 }
 
 int main(int argc, char* argv[]) {
-
-  find_most_violated_constraint_func = &find_most_violated_constraint_marginrescaling;
-
-
   double *w; /* weight vector */
   int outer_iter;
   long m, i;
@@ -1395,28 +1398,29 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
   struct_parm->print_extensive = 0;
   struct_parm->reduced_size = 0;
   struct_parm->init_valid_fraction_pos = 0.0;
+  struct_parm->margin_type = 0;
 
   struct_parm->custom_argc=0;
 
   for(i=1;(i<argc) && ((argv[i])[0] == '-');i++) {
     switch ((argv[i])[1]) {
     case 'c': i++; learn_parm->svm_c=atof(argv[i]); break;
-    case 'e': i++; learn_parm->eps=atof(argv[i]); break;
-    case 's': i++; learn_parm->svm_maxqpsize=atol(argv[i]); break; 
-    case 'g': i++; kernel_parm->rbf_gamma=atof(argv[i]); break;
     case 'd': i++; kernel_parm->poly_degree=atol(argv[i]); break;
-    case 'r': i++; learn_parm->biased_hyperplane=atol(argv[i]); break; 
-    case 't': i++; kernel_parm->kernel_type=atol(argv[i]); break;
-    case 'n': i++; learn_parm->maxiter=atol(argv[i]); break;
-    case 'p': i++; learn_parm->remove_inconsistent=atol(argv[i]); break; 
+    case 'e': i++; learn_parm->eps=atof(argv[i]); break;
+		case 'f': i++; struct_parm->init_valid_fraction = atof(argv[i]); break;
+    case 'g': i++; kernel_parm->rbf_gamma=atof(argv[i]); break;
 		case 'k': i++; *init_spl_weight = atof(argv[i]); break;
 		case 'm': i++; *spl_factor = atof(argv[i]); break;
+    case 'n': i++; learn_parm->maxiter=atol(argv[i]); break;
 		case 'o': i++; struct_parm->optimizer_type = atoi(argv[i]); break;
-		case 'f': i++; struct_parm->init_valid_fraction = atof(argv[i]); break;
-    case 'y': i++; struct_parm->init_valid_fraction_pos = atof(argv[i]); break;
+    case 'p': i++; learn_parm->remove_inconsistent=atol(argv[i]); break; 
+    case 'r': i++; learn_parm->biased_hyperplane=atol(argv[i]); break; 
+    case 's': i++; learn_parm->svm_maxqpsize=atol(argv[i]); break; 
+    case 't': i++; kernel_parm->kernel_type=atol(argv[i]); break;
     case 'u': i++; struct_parm->uncertainty_weight = atof(argv[i]); break;
     case 'v': i++; struct_parm->novelty_weight = atof(argv[i]); break;
     case 'x': i++; struct_parm->print_extensive = atoi(argv[i]); break;
+    case 'y': i++; struct_parm->init_valid_fraction_pos = atof(argv[i]); break;
     case 'z': i++; struct_parm->reduced_size = atoi(argv[i]); break;
     case '-': strcpy(struct_parm->custom_argv[struct_parm->custom_argc++],argv[i]);i++; strcpy(struct_parm->custom_argv[struct_parm->custom_argc++],argv[i]);break; 
     default: printf("\nUnrecognized option %s!\n\n",argv[i]);

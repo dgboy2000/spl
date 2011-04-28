@@ -632,10 +632,11 @@ void parse_struct_parameters(STRUCT_LEARN_PARM *sparm) {
   for (i=0;(i<sparm->custom_argc)&&((sparm->custom_argv[i])[0]=='-');i++) {
     switch ((sparm->custom_argv[i])[2]) {
       /* your code here */
-      case 'o': i++; sparm->bg_markov_order = atoi(sparm->custom_argv[i]); break;
       case 'm': i++; sparm->motif_length = atoi(sparm->custom_argv[i]); break;
+      case 'o': i++; sparm->bg_markov_order = atoi(sparm->custom_argv[i]); break;
       case 'r': i++; sparm->false_negative_cost = atof(sparm->custom_argv[i]); break;
       case 's': i++; sparm->rng_seed = atoi(sparm->custom_argv[i]); break;
+      case 't': i++; sparm->margin_type = atoi(sparm->custom_argv[i]); break;
       default: printf("\nUnrecognized option %s!\n\n", sparm->custom_argv[i]); exit(0);
     }
   }
