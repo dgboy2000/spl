@@ -9,3 +9,4 @@ print_svec (SVECTOR *a)
       printf ("SVEC[%d] = %f\n", w->wnum, w->weight);
     }
 }
+
