@@ -1,9 +1,10 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 #include <math.h>
-
+#include <string.h>
 
 
 void randomly_select_and_write(char ** all_datapoints, int num_datapoints,int num_to_select, FILE * ofp) {
@@ -34,13 +35,14 @@ void get_all_datapoints(FILE * ifp, char *** all_neg_datapoints, char *** all_po
   *num_pos_datapoints = 0;
   int i;
   for (i = 0; i < num_total_datapoints; i++) {
-    char * datapoint;
-    assert(fscanf(ifp, "%s\n", datapoint) == 1);
+    size_t line_length = 0;
+    char * datapoint = NULL;
+    getline(&datapoint, &line_length, ifp); //getline should malloc datapoint
     if (is_positive(datapoint)) {
-      (*all_pos_datapoints)[*num_pos_datapoints] = strdup(datapoint);
+      (*all_pos_datapoints)[*num_pos_datapoints] = datapoint;
       (*num_pos_datapoints)++;
     } else {
-      (*all_neg_datapoints)[*num_neg_datapoints] = strdup(datapoint);
+      (*all_neg_datapoints)[*num_neg_datapoints] = datapoint;
       (*num_neg_datapoints)++;
     }
   }
