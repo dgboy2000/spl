@@ -4,4 +4,5 @@ AlternateConvexSearch/bpacker
 AlternateConvexSearch/data
 AlternateConvexSearch/figures
 AlternateConvexSearch/output
-AlternateConvexSearch/runs/output/**/*.model.*
+AlternateConvexSearch/runs
+!AlternateConvexSearch/runs/output/*/*/STATS
