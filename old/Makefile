@@ -27,7 +27,7 @@ all: svm_motif_learn svm_motif_classify generate_test_dataset
 
 clean: 
 	rm -f *.o
-	rm -f svm_motif_learn svm_motif_classify
+	rm -f svm_motif_learn svm_motif_classify generate_test_dataset
 
 svm_motif_learn: svm_struct_latent_spl.o svm_common.o mosek_qp_optimize.o svm_struct_latent_api.o SFMT.o debug.o
 	$(LD) $(LDFLAGS) svm_struct_latent_spl.o svm_common.o mosek_qp_optimize.o SFMT.o svm_struct_latent_api.o debug.o -o svm_motif_learn $(LIBS) -L$(MSKLIBPATH) $(MSKLINKFLAGS)
@@ -36,7 +36,7 @@ svm_motif_classify: svm_struct_latent_classify.o svm_common.o svm_struct_latent_
 	$(LD) $(LDFLAGS) svm_struct_latent_classify.o svm_common.o SFMT.o svm_struct_latent_api.o -o svm_motif_classify $(LIBS)
 
 generate_test_dataset: generate_test_dataset.o
-	$(LD) $(LDFLAGS) generate_test_dataset.o -o generate_test_dataset
+	$(LD) $(LDFLAGS) generate_test_dataset.o -o generate_test_dataset $(LIBS)
 
 generate_test_dataset.o: generate_test_dataset.c
 	$(CC) -std=c99 -c $(CFLAGS) generate_test_dataset.c -o generate_test_dataset.o
