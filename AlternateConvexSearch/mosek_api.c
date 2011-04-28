@@ -49,9 +49,9 @@ print_mosek_stats ()
 void
 test_mosek ()
 {
-  debug_on ();
+  // debug_on ();
   test_mosek1 ();
-  printf ("Passed mosek test 1");
+  printf ("PASS: mosek test 1\n");
 }
 
 
@@ -81,7 +81,10 @@ test_mosek1()
                                     n, /* Size of w */
                                     n /* Number of y_hat/h_hat pairs */);
   
-  printf ("Found delta_w = %f, expected 4\n", delta_w);
+  if (debug)
+    {
+      printf ("Found delta_w = %f, expected 4\n", delta_w);
+    }
   assert (abs (delta_w - 4) < 0.0001);
   
   for (i=0; i<n; ++i)
