@@ -1,3 +1,7 @@
 mosek*
 !mosek_qp_optimize.*
+AlternateConvexSearch/bpacker
 AlternateConvexSearch/data
+AlternateConvexSearch/figures
+AlternateConvexSearch/output
+AlternateConvexSearch/runs/output/**/*.model.*
