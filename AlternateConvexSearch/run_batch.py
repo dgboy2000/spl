@@ -113,8 +113,11 @@ for alg_name, alg_jobs in jobs.iteritems():
         
         status = os.system(job_cmd)
         if status:
-          print "COMMAND FAILED: "+job_cmd
-          continue
+          if 'raise_errors' in params and params['raise_errors']:
+            raise RuntimeError("COMMAND FAILED: "+job_cmd)
+          else:
+            print "COMMAND FAILED: "+job_cmd
+            continue
           
         training_basename = '%s/motif%s_%d_%s' %(ALG_ROOT, prot, fold, seed)
         training_error_file = '%s.error.train' %training_basename

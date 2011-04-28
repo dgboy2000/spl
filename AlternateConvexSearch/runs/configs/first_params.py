@@ -15,5 +15,7 @@ This control run covers cccp, slack, and uncertainty for the existing algorithms
         'cccp' : ['-c 150 -k 0 -m 1.3', ''],
         'slack' : ['-c 150 -k 100 -m 1.3 -f 0.55', ''],
         'uncertainty' : ['-c 150 -k 100 -m 1.3 -f 0.55 -u 1', '']
-    }
+    },
+    
+    'raise_errors' : True
 }
