@@ -44,15 +44,6 @@
 #define DEBUG_LEVEL 0
 
 
-void find_most_violated_constraint(PATTERN x, LABEL y, LABEL *ybar, LATENT_VAR *hbar, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
-  switch (sparm->margin_type) {
-    case 0: find_most_violated_constraint_marginrescaling (x, y, ybar, hbar, sm, sparm); break;
-    case 1: find_most_violated_constraint_oppositey (x, y, ybar, hbar, sm, sparm); break;
-    default: printf ("Unrecognized margin_type '%d'\n", sparm->margin_type);
-    exit(1);
-  }
-}
-
 int mosek_qp_optimize(double**, double*, double*, long, double, double*);
 
 void my_read_input_parameters(int argc, char* argv[], char *trainfile, char *modelfile, char *examplesfile, char *timefile, char *latentfile, char *slackfile, char *uncertaintyfile, char *noveltyfile, char *lossfile,
@@ -103,6 +94,16 @@ double* add_list_nn(SVECTOR *a, long totwords)
       add_vector_ns(sum,f,f->factor);
 
     return(sum);
+}
+
+
+void find_most_violated_constraint(PATTERN x, LABEL y, LABEL *ybar, LATENT_VAR *hbar, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+  switch (sparm->margin_type) {
+    case 0: find_most_violated_constraint_marginrescaling (x, y, ybar, hbar, sm, sparm); break;
+    case 1: find_most_violated_constraint_oppositey (x, y, ybar, hbar, sm, sparm); break;
+    default: printf ("Unrecognized margin_type '%d'\n", sparm->margin_type);
+    exit(1);
+  }
 }
 
 
