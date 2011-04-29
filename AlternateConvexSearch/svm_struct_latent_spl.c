@@ -49,9 +49,7 @@ void (*find_most_violated_constraint_func)(PATTERN x, LABEL y, LABEL *ybar, LATE
 
 int mosek_qp_optimize(double**, double*, double*, long, double, double*);
 
-void my_read_input_parameters(int argc, char* argv[], char *trainfile, char *modelfile, char *examplesfile, char *timefile, char *latentfile, char *slackfile, char *uncertaintyfile, char *noveltyfile, char *lossfile,
-			      LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm, 
-						double *init_spl_weight, double *spl_factor);
+void my_read_input_parameters(int argc, char* argv[], char *trainfile,char *modelfile, char *examplesfile, char *timefile, char *latentfile,char *slackfile, char *uncertaintyfile, char *noveltyfile, char*lossfile,LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm,STRUCT_LEARN_PARM *struct_parm, double *init_spl_weight, double*spl_factor, int * using_argmax);
 
 void my_wait_any_key();
 
@@ -1201,14 +1199,14 @@ int main(int argc, char* argv[]) {
   /* prepare feature vector cache for correct labels with imputed latent variables */
   fycache = (SVECTOR**)malloc(m*sizeof(SVECTOR*));
   for (i=0;i<m;i++) {
-	if (using_argmax_h) {
+	if (using_argmax) {
 		fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
 		diff = add_list_ss(fy);
 		free_svector(fy);
 		fy = diff;
 		fycache[i] = fy;
 	} else {
-		fycache[i] = get_expected_psih(ex[i].x, ex[i].y, get_num_latent_variable_options(ex[i].x, ex[i].y, sm, sparm), ASIGM, sm, sparm);
+		fycache[i] = get_expected_psih(ex[i].x, ex[i].y, get_num_latent_variable_options(ex[i].x, ex[i].y, &sm, &sparm), ASIGM, &sm, &sparm);
 	}
   }
 
@@ -1342,7 +1340,7 @@ int main(int argc, char* argv[]) {
 		fy = diff;
 		fycache[i] = fy;
 	} else {
-		fycache[i] = get_expected_psih(ex[i].x, ex[i].y, get_num_latent_variable_options(ex[i].x, ex[i].y, sm, sparm), ASIGM, sm, sparm);
+		fycache[i] = get_expected_psih(ex[i].x, ex[i].y, get_num_latent_variable_options(ex[i].x, ex[i].y, &sm, &sparm), ASIGM, &sm, &sparm);
 	}
     }
 		sprintf(itermodelfile,"%s.%04d",modelfile,outer_iter);
