@@ -765,7 +765,7 @@ double get_entropy(double *distrib, int numEntries) {
 	return(entropy);
 }
 
-double * get_h_probabilities(PATTERN x, LABEL y, int numPositions, double Asigm, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
+double * get_h_probabilities(PATTERN x, LABEL y, int numPositions, double Asigm, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
       double * hvScores = malloc(numPositions * sizeof(double));
       get_latent_variable_scores(x, y, hvScores, sm, sparm); 
       double scoreSum = 0.0;
@@ -1141,7 +1141,7 @@ int main(int argc, char* argv[]) {
 	int *valid_examples;
      
   double *slacks, *entropies, *novelties, *losses;
-	bool using_argmax;
+	int using_argmax;
   /* read input parameters */
 	my_read_input_parameters(argc, argv, trainfile, modelfile, examplesfile, timefile, latentfile, slackfile, uncertaintyfile, noveltyfile, lossfile,
                       &learn_parm, &kernel_parm, &sparm, &init_spl_weight, &spl_factor, &using_argmax); 
@@ -1400,7 +1400,7 @@ int main(int argc, char* argv[]) {
 
 
 
-void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* modelfile, char *examplesfile, char *timefile, char *latentfile, char *slackfile, char *uncertaintyfile, char *noveltyfile, char *lossfile, LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm,double *init_spl_weight, double *spl_factor, bool * using_argmax) {
+void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* modelfile, char *examplesfile, char *timefile, char *latentfile,char *slackfile, char *uncertaintyfile, char *noveltyfile, char *lossfile,LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm,double *init_spl_weight, double *spl_factor, int * using_argmax) {
   
   long i;
 	char filestub[1024];
@@ -1432,7 +1432,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
 
 
 	/*CHANGE THIS SO THAT IT SETS using_argmax TO WHATEVER THE USER WANTS IT TO BE!!!*/
-	*using_argmax = false;
+	*using_argmax = 0;
 	/*-------------------------------------------------------------------------------*/
 
   for(i=1;(i<argc) && ((argv[i])[0] == '-');i++) {
