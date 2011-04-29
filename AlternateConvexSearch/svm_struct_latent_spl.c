@@ -43,6 +43,7 @@
 
 #define DEBUG_LEVEL 0
 
+#define ASIGM -1.5
 
 void (*find_most_violated_constraint_func)(PATTERN x, LABEL y, LABEL *ybar, LATENT_VAR *hbar, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
 
@@ -764,17 +765,50 @@ double get_entropy(double *distrib, int numEntries) {
 	return(entropy);
 }
 
+double * get_h_probabilities(PATTERN x, LABEL y, int numPositions, double Asigm, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
+      double * hvScores = malloc(numPositions * sizeof(double));
+      get_latent_variable_scores(x, y, hvScores, sm, sparm); 
+      double scoreSum = 0.0;
+	long j;
+      for(j = 0; j < numPositions; j++) {
+        hvScores[j] = 1/(1+exp(Asigm*hvScores[j]));
+        scoreSum += hvScores[j];
+      }
+      for(j = 0; j < numPositions; j++) {
+        hvScores[j] /= scoreSum;
+      }
+	return hvScores;
+}
+
+SVECTOR * get_expected_psih(PATTERN x, LABEL y, int numPositions, double Asigm, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+	double * hvScores = get_h_probabilities(x, y, numPositions, Asigm, sm, sparm);
+	long j;
+	LATENT_VAR h;
+	h.position = 1;
+	SVECTOR * psih = psi(x, y, h, sm, sparm);
+	SVECTOR * expected_psih = smult_s(psih, hvScores[0]);
+	free(psih);
+	for (h.position = 1; h.position < numPositions; h.position++) {
+		SVECTOR * b = psi(x, y, h, sm, sparm);
+		SVECTOR * ma =  multadd_ss(expected_psih, b, hvScores[h.position]);
+		free(expected_psih);
+		free(b);
+		expected_psih = ma;  
+	}
+	free(hvScores);
+	return expected_psih;
+}
+
 sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex, 
 													STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, 
                           double *losses, double *slacks, double *entropies, double *novelties) {
-	long i, j;
+	long i;
   int numPositions;
 	double difficulty, lossval, uncertainty, novelty, *hvScores, scoreSum;
 
 	double uncertaintyWeight = sparm->uncertainty_weight;
   double noveltyWeight = sparm->novelty_weight;
   double difficultyWeight = 1.0-uncertaintyWeight-noveltyWeight;
-  double Asigm = -1.5; /* param for fitting sigmoid to turn h scores into probabilities */
 
   sortStruct *exampleScores = (sortStruct *) malloc(m*sizeof(sortStruct));
 	LABEL ybar;
@@ -810,17 +844,7 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
     
     if(uncertaintyWeight || sparm->print_extensive) {
       numPositions = get_num_latent_variable_options(ex[i].x, ex[i].y, sm, sparm);
-      hvScores = malloc(numPositions * sizeof(double));
-      get_latent_variable_scores(ex[i].x, ex[i].y, hvScores, sm, sparm);
-      
-      scoreSum = 0.0;
-      for(j = 0; j < numPositions; j++) {
-        hvScores[j] = 1/(1+exp(Asigm*hvScores[j]));
-        scoreSum += hvScores[j];
-      }
-      for(j = 0; j < numPositions; j++) {
-        hvScores[j] /= scoreSum;
-      }
+	hvScores = get_h_probabilities(ex[i].x, ex[i].y, numPositions, ASIGM, sm, sparm);
 
       uncertainty = get_entropy(hvScores, numPositions);
       free(hvScores);
@@ -1104,7 +1128,7 @@ int main(int argc, char* argv[]) {
 	SAMPLE val;
   STRUCT_LEARN_PARM sparm;
   STRUCTMODEL sm;
-  
+
   double decrement;
   double primal_obj, last_primal_obj;
   double stop_crit; 
@@ -1117,10 +1141,10 @@ int main(int argc, char* argv[]) {
 	int *valid_examples;
      
   double *slacks, *entropies, *novelties, *losses;
-
+	bool using_argmax;
   /* read input parameters */
 	my_read_input_parameters(argc, argv, trainfile, modelfile, examplesfile, timefile, latentfile, slackfile, uncertaintyfile, noveltyfile, lossfile,
-                      &learn_parm, &kernel_parm, &sparm, &init_spl_weight, &spl_factor); 
+                      &learn_parm, &kernel_parm, &sparm, &init_spl_weight, &spl_factor, &using_argmax); 
 
   epsilon = learn_parm.eps;
   C = learn_parm.svm_c;
@@ -1177,11 +1201,15 @@ int main(int argc, char* argv[]) {
   /* prepare feature vector cache for correct labels with imputed latent variables */
   fycache = (SVECTOR**)malloc(m*sizeof(SVECTOR*));
   for (i=0;i<m;i++) {
-    fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
-    diff = add_list_ss(fy);
-    free_svector(fy);
-    fy = diff;
-    fycache[i] = fy;
+	if (using_argmax_h) {
+		fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
+		diff = add_list_ss(fy);
+		free_svector(fy);
+		fy = diff;
+		fycache[i] = fy;
+	} else {
+		fycache[i] = get_expected_psih(ex[i].x, ex[i].y, get_num_latent_variable_options(ex[i].x, ex[i].y, sm, sparm), ASIGM, sm, sparm);
+	}
   }
 
  	/* learn initial weight vector using all training examples */
@@ -1292,24 +1320,30 @@ int main(int argc, char* argv[]) {
 			stop_crit = 0;
 		if(!latent_update)
 			stop_crit = 0;
-  
-    /* impute latent variable using updated weight vector */
+ 
+
 		if(nValid) {
-    	for (i=0;i<m;i++) {
-      	free_latent_var(ex[i].h);
-      	ex[i].h = infer_latent_variables(ex[i].x, ex[i].y, &sm, &sparm);
-    	}
+    			for (i=0;i<m;i++) {
+			    	/* impute latent variable using updated weight vector */
+				/* (imputation happens even if imputed latent variables won't be used in inner loop, so that we can still use latent_update as a stopping criterion)*/
+		      		free_latent_var(ex[i].h);
+		      		ex[i].h = infer_latent_variables(ex[i].x, ex[i].y, &sm, &sparm);
+			}
 			latent_update++;
 		}
   
     /* re-compute feature vector cache */
     for (i=0;i<m;i++) {
       free_svector(fycache[i]);
-      fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
-      diff = add_list_ss(fy);
-      free_svector(fy);
-      fy = diff;
-      fycache[i] = fy;
+	if (using_argmax) {
+		fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
+		diff = add_list_ss(fy);
+		free_svector(fy);
+		fy = diff;
+		fycache[i] = fy;
+	} else {
+		fycache[i] = get_expected_psih(ex[i].x, ex[i].y, get_num_latent_variable_options(ex[i].x, ex[i].y, sm, sparm), ASIGM, sm, sparm);
+	}
     }
 		sprintf(itermodelfile,"%s.%04d",modelfile,outer_iter);
 		write_struct_model(itermodelfile, &sm, &sparm);
@@ -1366,9 +1400,7 @@ int main(int argc, char* argv[]) {
 
 
 
-void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* modelfile, char *examplesfile, char *timefile, char *latentfile, char *slackfile, char *uncertaintyfile, char *noveltyfile, char *lossfile,
-			      LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm,
-						double *init_spl_weight, double *spl_factor) {
+void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* modelfile, char *examplesfile, char *timefile, char *latentfile, char *slackfile, char *uncertaintyfile, char *noveltyfile, char *lossfile, LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm,double *init_spl_weight, double *spl_factor, bool * using_argmax) {
   
   long i;
 	char filestub[1024];
@@ -1397,6 +1429,11 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
   struct_parm->init_valid_fraction_pos = 0.0;
 
   struct_parm->custom_argc=0;
+
+
+	/*CHANGE THIS SO THAT IT SETS using_argmax TO WHATEVER THE USER WANTS IT TO BE!!!*/
+	*using_argmax = false;
+	/*-------------------------------------------------------------------------------*/
 
   for(i=1;(i<argc) && ((argv[i])[0] == '-');i++) {
     switch ((argv[i])[1]) {
