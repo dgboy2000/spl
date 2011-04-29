@@ -7,6 +7,7 @@ import math
 import os
 import sys
 
+print sys.argv
 assert len(sys.argv) == 2, "Correct usage is python run_batch.py [params file]"
 execfile(sys.argv[1])
 
