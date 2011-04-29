@@ -26,6 +26,7 @@
 #include "debug.h"
 #include "svm_struct_latent_api.h"
 #include "./svm_light/svm_learn.h"
+#include "./svm_light/svm_common.h"
 #include "mosek_api.h"
 
 
@@ -793,12 +794,15 @@ SVECTOR * get_expected_psih(PATTERN x, LABEL y, int numPositions, double Asigm, 
 	h.position = 1;
 	SVECTOR * psih = psi(x, y, h, sm, sparm);
 	SVECTOR * expected_psih = smult_s(psih, hvScores[0]);
-	free(psih);
+	free_svector(psih);
 	for (h.position = 1; h.position < numPositions; h.position++) {
 		SVECTOR * b = psi(x, y, h, sm, sparm);
-		SVECTOR * ma =  multadd_ss(expected_psih, b, hvScores[h.position]);
-		free(expected_psih);
-		free(b);
+		SVECTOR * mult =  smult_s(b, hvScores[h.position]);
+    SVECTOR * ma = add_ss(expected_psih, mult);
+    
+    free_svector(mult);
+		free_svector(expected_psih);
+		free_svector(b);
 		expected_psih = ma;  
 	}
 	free(hvScores);
@@ -808,7 +812,7 @@ SVECTOR * get_expected_psih(PATTERN x, LABEL y, int numPositions, double Asigm, 
 sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex, 
 													STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, 
                           double *losses, double *slacks, double *entropies, double *novelties) {
-	long i;
+	long i, j;
   int numPositions;
 	double difficulty, lossval, uncertainty, novelty, *hvScores, scoreSum;
 
@@ -1435,7 +1439,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
 
 
 	/*CHANGE THIS SO THAT IT SETS using_argmax TO WHATEVER THE USER WANTS IT TO BE!!!*/
-	*using_argmax = 0;
+	*using_argmax = 0; // 0 means use expectation, 1 means argmax
 	/*-------------------------------------------------------------------------------*/
 
   for(i=1;(i<argc) && ((argv[i])[0] == '-');i++) {
