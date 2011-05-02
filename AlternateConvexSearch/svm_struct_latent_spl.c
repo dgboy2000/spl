@@ -1237,11 +1237,15 @@ int main(int argc, char* argv[]) {
    		}
 	    for (i=0;i<m;i++) {
   	    free_svector(fycache[i]);
-    	  fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
-     	 diff = add_list_ss(fy);
-     	 free_svector(fy);
-     	 fy = diff;
-     	 fycache[i] = fy;
+    	  if (using_argmax) {
+    	    fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
+     	    diff = add_list_ss(fy);
+          free_svector(fy);
+          fy = diff;
+          fycache[i] = fy;
+        } else {
+          fycache[i] = get_expected_psih(ex[i].x, ex[i].y, get_num_latent_variable_options(ex[i].x, ex[i].y, &sm, &sparm), ASIGM, &sm, &sparm);
+        }
     	}
 		}
 	}
@@ -1329,11 +1333,11 @@ int main(int argc, char* argv[]) {
  
 
 		if(nValid) {
-    			for (i=0;i<m;i++) {
-			    	/* impute latent variable using updated weight vector */
-				/* (imputation happens even if imputed latent variables won't be used in inner loop, so that we can still use latent_update as a stopping criterion)*/
-		      		free_latent_var(ex[i].h);
-		      		ex[i].h = infer_latent_variables(ex[i].x, ex[i].y, &sm, &sparm);
+      for (i=0;i<m;i++) {
+        /* impute latent variable using updated weight vector */
+    /* (imputation happens even if imputed latent variables won't be used in inner loop, so that we can still use latent_update as a stopping criterion)*/
+          free_latent_var(ex[i].h);
+          ex[i].h = infer_latent_variables(ex[i].x, ex[i].y, &sm, &sparm);
 			}
 			latent_update++;
 		}
@@ -1341,15 +1345,15 @@ int main(int argc, char* argv[]) {
     /* re-compute feature vector cache */
     for (i=0;i<m;i++) {
       free_svector(fycache[i]);
-	if (using_argmax) {
-		fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
-		diff = add_list_ss(fy);
-		free_svector(fy);
-		fy = diff;
-		fycache[i] = fy;
-	} else {
-		fycache[i] = get_expected_psih(ex[i].x, ex[i].y, get_num_latent_variable_options(ex[i].x, ex[i].y, &sm, &sparm), ASIGM, &sm, &sparm);
-	}
+      if (using_argmax) {
+        fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
+        diff = add_list_ss(fy);
+        free_svector(fy);
+        fy = diff;
+        fycache[i] = fy;
+      } else {
+        fycache[i] = get_expected_psih(ex[i].x, ex[i].y, get_num_latent_variable_options(ex[i].x, ex[i].y, &sm, &sparm), ASIGM, &sm, &sparm);
+      }
     }
 		sprintf(itermodelfile,"%s.%04d",modelfile,outer_iter);
 		write_struct_model(itermodelfile, &sm, &sparm);
@@ -1439,7 +1443,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
 
 
 	/*CHANGE THIS SO THAT IT SETS using_argmax TO WHATEVER THE USER WANTS IT TO BE!!!*/
-	*using_argmax = 0; // 0 means use expectation, 1 means argmax
+	*using_argmax = 1; // 0 means use expectation, 1 means argmax
 	/*-------------------------------------------------------------------------------*/
 
   for(i=1;(i<argc) && ((argv[i])[0] == '-');i++) {
