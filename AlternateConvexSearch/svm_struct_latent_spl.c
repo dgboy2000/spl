@@ -773,17 +773,17 @@ double get_entropy(double *distrib, int numEntries) {
 }
 
 double * get_h_probabilities(PATTERN x, LABEL y, int numPositions, double Asigm, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
-      double * hvScores = malloc(numPositions * sizeof(double));
-      get_latent_variable_scores(x, y, hvScores, sm, sparm); 
-      double scoreSum = 0.0;
-	long j;
-      for(j = 0; j < numPositions; j++) {
-        hvScores[j] = 1/(1+exp(Asigm*hvScores[j]));
-        scoreSum += hvScores[j];
-      }
-      for(j = 0; j < numPositions; j++) {
-        hvScores[j] /= scoreSum;
-      }
+  double * hvScores = malloc(numPositions * sizeof(double));
+  get_latent_variable_scores(x, y, hvScores, sm, sparm); 
+  double scoreSum = 0.0;
+  long j;
+  for(j = 0; j < numPositions; j++) {
+    hvScores[j] = 1/(1+exp(Asigm*hvScores[j]));
+    scoreSum += hvScores[j];
+  }
+  for(j = 0; j < numPositions; j++) {
+    hvScores[j] /= scoreSum;
+  }
 	return hvScores;
 }
 
@@ -791,7 +791,7 @@ SVECTOR * get_expected_psih(PATTERN x, LABEL y, int numPositions, double Asigm, 
 	double * hvScores = get_h_probabilities(x, y, numPositions, Asigm, sm, sparm);
 	long j;
 	LATENT_VAR h;
-	h.position = 1;
+	h.position = 0;
 	SVECTOR * psih = psi(x, y, h, sm, sparm);
 	SVECTOR * expected_psih = smult_s(psih, hvScores[0]);
 	free_svector(psih);
@@ -854,7 +854,7 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
     
     if(uncertaintyWeight || sparm->print_extensive) {
       numPositions = get_num_latent_variable_options(ex[i].x, ex[i].y, sm, sparm);
-	hvScores = get_h_probabilities(ex[i].x, ex[i].y, numPositions, ASIGM, sm, sparm);
+	    hvScores = get_h_probabilities(ex[i].x, ex[i].y, numPositions, ASIGM, sm, sparm);
 
       uncertainty = get_entropy(hvScores, numPositions);
       free(hvScores);
