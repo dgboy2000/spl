@@ -351,7 +351,7 @@ void find_most_violated_constraint_marginrescaling(EXAMPLE *ex, LABEL *ybar, LAT
 
   // most-violated constraint allowing y-bar to equal y
   // zero-one loss
-  if ((ex->y).label==1) {
+  if (ex->y.label==1) {
     if (max_score>1.0) { 
       ybar->label = 1;
       hbar->position = max_pos;
@@ -382,12 +382,24 @@ void find_most_violated_constraint_oppositey(EXAMPLE *ex, LABEL *ybar, LATENT_VA
   double max_score;
   int max_pos;
 
-  ybar->label = -1 * (ex->y).label;
-  if (ybar->label == 1) {
-    find_argmax_hbar(ex->x, sm, sparm, &max_score, &max_pos);
-    hbar->position = max_pos;
+  ybar->label = -1 * ex->y.label;
+  find_argmax_hbar(ex->x, sm, sparm, &max_score, &max_pos);
+  if (ex->y.label == 1) {
+    if (1.0+max_score > 0) {
+      ybar->label = -1;
+      hbar->position = -1;
+    } else {
+      ybar->label = 1;
+      hbar->position = ex->h.position;
+    }
   } else {
-    hbar->position = -1;
+    if (1.0+max_score > 0) {
+      ybar->label = 1;
+      hbar->position = max_pos;
+    } else {
+      ybar->label = -1;
+      hbar->position = -1;
+    }
   }
 
 }
