@@ -337,7 +337,7 @@ find_argmax_hbar (PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, double *
   }
 }
 
-void find_most_violated_constraint_marginrescaling(PATTERN x, LABEL y, LABEL *ybar, LATENT_VAR *hbar, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+void find_most_violated_constraint_marginrescaling(EXAMPLE *ex, LABEL *ybar, LATENT_VAR *hbar, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
 //
 //  Finds the most violated constraint (loss-augmented inference), i.e.,
 //  computing argmax_{(ybar,hbar)} [<w,psi(x,ybar,hbar)> + loss(y,ybar,hbar)].
@@ -347,11 +347,11 @@ void find_most_violated_constraint_marginrescaling(PATTERN x, LABEL y, LABEL *yb
   double max_score;
   int max_pos;
 
-  find_argmax_hbar (x, sm, sparm, &max_score, &max_pos);
+  find_argmax_hbar (ex->x, sm, sparm, &max_score, &max_pos);
 
   // most-violated constraint allowing y-bar to equal y
   // zero-one loss
-  if (y.label==1) {
+  if ((ex->y).label==1) {
     if (max_score>1.0) { 
       ybar->label = 1;
       hbar->position = max_pos;
@@ -371,7 +371,7 @@ void find_most_violated_constraint_marginrescaling(PATTERN x, LABEL y, LABEL *yb
   
 }
 
-void find_most_violated_constraint_oppositey(PATTERN x, LABEL y, LABEL *ybar, LATENT_VAR *hbar, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+void find_most_violated_constraint_oppositey(EXAMPLE *ex, LABEL *ybar, LATENT_VAR *hbar, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
 //
 //  Finds the most violated constraint (loss-augmented inference), 
 //  given that ybar must be different than y i.e.,
@@ -382,9 +382,9 @@ void find_most_violated_constraint_oppositey(PATTERN x, LABEL y, LABEL *ybar, LA
   double max_score;
   int max_pos;
 
-  ybar->label = -1 * y.label;
+  ybar->label = -1 * (ex->y).label;
   if (ybar->label == 1) {
-    find_argmax_hbar(x, sm, sparm, &max_score, &max_pos);
+    find_argmax_hbar(ex->x, sm, sparm, &max_score, &max_pos);
     hbar->position = max_pos;
   } else {
     hbar->position = -1;
@@ -442,12 +442,12 @@ LATENT_VAR infer_latent_variables(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LE
     for (k=0;k<x.length-sparm->motif_length-sparm->bg_markov_order;k++) {
       score = 0.0;
       for (j=k;j<k+sparm->motif_length;j++) {
-	score += sm->w[sm->sizePsi-(4*(j-k)+base2int(x.sequence[j]))];
-	score -= sm->w[1+pattern_hash[j]];
+        score += sm->w[sm->sizePsi-(4*(j-k)+base2int(x.sequence[j]))];
+        score -= sm->w[1+pattern_hash[j]];
       }
       if (score>max_score) {
-	max_score = score;
-	max_pos = k;
+        max_score = score;
+        max_pos = k;
       }
     }
     h.position = max_pos;

@@ -97,10 +97,10 @@ double* add_list_nn(SVECTOR *a, long totwords)
 }
 
 
-void find_most_violated_constraint(PATTERN x, LABEL y, LABEL *ybar, LATENT_VAR *hbar, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+void find_most_violated_constraint(EXAMPLE *ex, LABEL *ybar, LATENT_VAR *hbar, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
   switch (sparm->margin_type) {
-    case 0: find_most_violated_constraint_marginrescaling (x, y, ybar, hbar, sm, sparm); break;
-    case 1: find_most_violated_constraint_oppositey (x, y, ybar, hbar, sm, sparm); break;
+    case 0: find_most_violated_constraint_marginrescaling (ex, ybar, hbar, sm, sparm); break;
+    case 1: find_most_violated_constraint_oppositey (ex, ybar, hbar, sm, sparm); break;
     default: printf ("Unrecognized margin_type '%d'\n", sparm->margin_type);
     exit(1);
   }
@@ -123,7 +123,7 @@ double current_obj_val(EXAMPLE *ex, SVECTOR **fycache, long m, STRUCTMODEL *sm, 
   for (i=0;i<m;i++) {
 		if(!valid_examples[i])
 			continue;
-    find_most_violated_constraint(ex[i].x, ex[i].y, &ybar, &hbar, sm, sparm);
+    find_most_violated_constraint(&(ex[i]), &ybar, &hbar, sm, sparm);
     /* get difference vector */
     fy = copy_svector(fycache[i]);
     fybar = psi(ex[i].x,ybar,hbar,sm,sparm);
@@ -206,7 +206,7 @@ SVECTOR* find_cutting_plane(EXAMPLE *ex, SVECTOR **fycache, double *margin, long
 			continue;
 		}
 
-    find_most_violated_constraint(ex[i].x, ex[i].y, &ybar, &hbar, sm, sparm);
+    find_most_violated_constraint(&(ex[i]), &ybar, &hbar, sm, sparm);
     // printf ("Most violated constraint %d is (y, h) = (%d, %d)\n", i, ybar.label, hbar.position);
     /* get difference vector */
     fy = copy_svector(fycache[i]);
@@ -360,7 +360,7 @@ double stochastic_subgradient_descent(double *w, long m, int MAX_ITER, double C,
 
 		for(i=0;i<subset_size;i++) {
 			/* find subgradient */
-   		find_most_violated_constraint(ex[valid_indices[perm[i]]].x, ex[valid_indices[perm[i]]].y, &ybar, &hbar, sm, sparm);
+   		find_most_violated_constraint(&(ex[valid_indices[perm[i]]]), &ybar, &hbar, sm, sparm);
    		lossval = loss(ex[valid_indices[perm[i]]].y,ybar,hbar,sparm);
    		fy = copy_svector(fycache[valid_indices[perm[i]]]);
    		fybar = psi(ex[valid_indices[perm[i]]].x,ybar,hbar,sm,sparm);
@@ -826,7 +826,7 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
 	SVECTOR *f, *fy, *fybar;
 
 	for (i=0;i<m;i++) {		
-		find_most_violated_constraint(ex[i].x, ex[i].y, &ybar, &hbar, sm, sparm);
+		find_most_violated_constraint(&(ex[i]), &ybar, &hbar, sm, sparm);
 		fy = copy_svector(fycache[i]);
 		fybar = psi(ex[i].x,ybar,hbar,sm,sparm);
 		exampleScores[i].index = i;

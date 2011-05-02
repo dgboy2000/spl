@@ -12,6 +12,35 @@
 # Inference
 ./svm_motif_classify ../small.data motif.model motif.testerror
 
+# Opposite y
+./svm_motif_learn -c 150 -k 0 -m 1.3 --t 1 --s 0000 data/train052_1.data motif.cccp.opp.model motif.cccp.opp # Small data
+./svm_motif_learn -c 150 -k 100 -m 1.3 -f 0.55 --t 1 --s 0000 data/train052_1.data motif.slack.opp.model motif.slack.opp # Small data
+./svm_motif_learn -c 150 -k 100 -m 1.3 -f 0.55 -u 1.0 --t 1 --s 0000 data/train052_1.data motif.unc.opp.model motif.unc.opp # Small data
+./svm_motif_learn -c 150 -k 0 -m 1.3 --t 0 --s 0000 data/train052_1.data motif.cccp.mar.model motif.cccp.mar # Small data
+./svm_motif_learn -c 150 -k 100 -m 1.3 -f 0.55 --t 0 --s 0000 data/train052_1.data motif.slack.mar.model motif.slack.mar # Small data
+./svm_motif_learn -c 150 -k 100 -m 1.3 -f 0.55 -u 1.0 --t 0 --s 0000 data/train052_1.data motif.unc.mar.model motif.unc.mar # Small data
+
+# Train error
+./svm_motif_classify data/train052_1.data motif.cccp.opp.model motif.cccp.opp.trainerror
+./svm_motif_classify data/train052_1.data motif.slack.opp.model motif.slack.opp.trainerror
+./svm_motif_classify data/train052_1.data motif.unc.opp.model motif.unc.opp.trainerror
+./svm_motif_classify data/train052_1.data motif.cccp.mar.model motif.cccp.mar.trainerror
+./svm_motif_classify data/train052_1.data motif.slack.mar.model motif.slack.mar.trainerror
+./svm_motif_classify data/train052_1.data motif.unc.mar.model motif.unc.mar.trainerror
+
+# Test error
+./svm_motif_classify data/test052_1.data motif.cccp.opp.model motif.cccp.opp.testerror
+./svm_motif_classify data/test052_1.data motif.slack.opp.model motif.slack.opp.testerror
+./svm_motif_classify data/test052_1.data motif.unc.opp.model motif.unc.opp.testerror
+./svm_motif_classify data/test052_1.data motif.cccp.mar.model motif.cccp.mar.testerror
+./svm_motif_classify data/test052_1.data motif.slack.mar.model motif.slack.mar.testerror
+./svm_motif_classify data/test052_1.data motif.unc.mar.model motif.unc.mar.testerror
+
+# Expectation
+./svm_motif_learn -c 150 -k 0 -m 1.3 --s 0000 data/train052_1.data motif.cccp.exp.model motif.cccp.exp # Small data
+./svm_motif_learn -c 150 -k 100 -m 1.3 -f 0.55 --s 0000 data/train052_1.data motif.slack.exp.model motif.slack.exp # Small data
+./svm_motif_learn -c 150 -k 100 -m 1.3 -f 0.55 -u 1.0 --s 0000 data/train052_1.data motif.unc.exp.model motif.unc.exp # Small data
+
 
 # Pipelining with a script:
 -script submits a batch of learning jobs with specified params, and data sets, folds, random seeds. script puts everything from the same run in a single directory, with a file containing the run parameters, and description of the run
