@@ -332,10 +332,8 @@ compute_psi_diff_score (PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, in
 static void
 find_argmax_hbar (PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, double *max_score, int *max_pos) {
   double score;
-  int *pattern_hash, j, h;
-  
-  pattern_hash = sm->pattern_hash[x.example_id];
-  
+  int h;
+    
   *max_score = -1E10;
   *max_pos = -1;
   
@@ -394,7 +392,6 @@ void find_most_violated_constraint_oppositey(EXAMPLE *ex, LABEL *ybar, LATENT_VA
   int max_pos;
 
   ybar->label = -1 * ex->y.label;
-  find_argmax_hbar(ex->x, sm, sparm, &max_score, &max_pos);
   if (ex->y.label == 1) {
     if (1.0+max_score > 0) {
       ybar->label = -1;
@@ -404,6 +401,7 @@ void find_most_violated_constraint_oppositey(EXAMPLE *ex, LABEL *ybar, LATENT_VA
       hbar->position = ex->h.position;
     }
   } else {
+    find_argmax_hbar(ex->x, sm, sparm, &max_score, &max_pos);
     if (1.0+max_score > 0) {
       ybar->label = 1;
       hbar->position = max_pos;
