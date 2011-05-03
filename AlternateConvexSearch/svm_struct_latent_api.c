@@ -312,6 +312,21 @@ void classify_struct_example(PATTERN x, LABEL *y, LATENT_VAR *h, STRUCTMODEL *sm
   }
 }
 
+static double
+compute_psi_diff_score (PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int h_position)
+{
+  double score;
+  int *pattern_hash, j;
+  
+  pattern_hash = sm->pattern_hash[x.example_id];
+  
+  score = 0.0;
+  for (j=h_position; j<h_position+sparm->motif_length; j++) {
+    score += sm->w[sm->sizePsi-(4*(j-h_position)+base2int(x.sequence[j]))];
+    score -= sm->w[1+pattern_hash[j]];
+  }
+  return score;
+}
 
 // Assuming the y=-1 label has score 0, compute the relative scores of the y=1 hidden variable locations
 static void
@@ -325,11 +340,7 @@ find_argmax_hbar (PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, double *
   *max_pos = -1;
   
   for (h=0;h<x.length-sparm->motif_length-sparm->bg_markov_order;h++) {
-    score = 0.0;
-    for (j=h; j<h+sparm->motif_length; j++) {
-      score += sm->w[sm->sizePsi-(4*(j-h)+base2int(x.sequence[j]))];
-      score -= sm->w[1+pattern_hash[j]];
-    }
+    score = compute_psi_diff_score(x, sm, sparm, h);
     if (score>*max_score) {
       *max_score = score;
       *max_pos = h;
