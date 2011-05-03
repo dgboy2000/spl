@@ -1448,6 +1448,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
 
   for(i=1;(i<argc) && ((argv[i])[0] == '-');i++) {
     switch ((argv[i])[1]) {
+    case 'a': i++; *using_argmax=atoi(argv[i]); break;
     case 'c': i++; learn_parm->svm_c=atof(argv[i]); break;
     case 'd': i++; kernel_parm->poly_degree=atol(argv[i]); break;
     case 'e': i++; learn_parm->eps=atof(argv[i]); break;

@@ -102,5 +102,6 @@ typedef struct struct_learn_parm {
   int print_extensive;
   int reduced_size;
   int margin_type;
+  int using_argmax; // 0 means use expectation, 1 means argmax
 } STRUCT_LEARN_PARM;
 
