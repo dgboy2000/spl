@@ -22,6 +22,7 @@
 #include "./SFMT-src-1.3.3/SFMT.h"
 
 #define MAX_INPUT_LINE_LENGTH 10000
+#define DELTA 1.0
 
 #define MAX(x,y) ((x) < (y) ? (y) : (x))
 #define MIN(x,y) ((x) > (y) ? (y) : (x))
@@ -361,7 +362,7 @@ void find_most_violated_constraint_marginrescaling(EXAMPLE *ex, LABEL *ybar, LAT
   // most-violated constraint allowing y-bar to equal y
   // zero-one loss
   if (ex->y.label==1) {
-    if (max_score>1.0) { 
+    if (max_score > DELTA) { 
       ybar->label = 1;
       hbar->position = max_pos;
     } else {
@@ -369,7 +370,7 @@ void find_most_violated_constraint_marginrescaling(EXAMPLE *ex, LABEL *ybar, LAT
       hbar->position = -1;
     }
   } else {
-    if (1.0+max_score>0) {
+    if (DELTA+max_score > 0) {
       ybar->label = 1;
       hbar->position = max_pos;
     } else {
@@ -393,16 +394,17 @@ void find_most_violated_constraint_oppositey(EXAMPLE *ex, LABEL *ybar, LATENT_VA
 
   ybar->label = -1 * ex->y.label;
   if (ex->y.label == 1) {
-    if (1.0+max_score > 0) {
-      ybar->label = -1;
-      hbar->position = -1;
-    } else {
+    max_score = compute_psi_diff_score (ex->x, sm, sparm, ex->h.position);
+    if (max_score > DELTA) {
       ybar->label = 1;
       hbar->position = ex->h.position;
+    } else {  
+      ybar->label = -1;
+      hbar->position = -1;
     }
   } else {
     find_argmax_hbar(ex->x, sm, sparm, &max_score, &max_pos);
-    if (1.0+max_score > 0) {
+    if (DELTA+max_score > 0) {
       ybar->label = 1;
       hbar->position = max_pos;
     } else {
