@@ -48,7 +48,7 @@
 
 int mosek_qp_optimize(double**, double*, double*, long, double, double*);
 
-void my_read_input_parameters(int argc, char* argv[], char *trainfile,char *modelfile, char *examplesfile, char *timefile, char *latentfile,char *slackfile, char *uncertaintyfile, char *noveltyfile, char*lossfile,LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm,STRUCT_LEARN_PARM *struct_parm, double *init_spl_weight, double*spl_factor, int * using_argmax);
+void my_read_input_parameters(int argc, char* argv[], char *trainfile,char *modelfile, char *examplesfile, char *timefile, char *latentfile,char *slackfile, char *uncertaintyfile, char *noveltyfile, char*lossfile,LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm,STRUCT_LEARN_PARM *struct_parm, double *init_spl_weight, double*spl_factor);
 
 void my_wait_any_key();
 
@@ -1147,10 +1147,9 @@ int main(int argc, char* argv[]) {
 	int *valid_examples;
      
   double *slacks, *entropies, *novelties, *losses;
-	int using_argmax;
   /* read input parameters */
 	my_read_input_parameters(argc, argv, trainfile, modelfile, examplesfile, timefile, latentfile, slackfile, uncertaintyfile, noveltyfile, lossfile,
-                      &learn_parm, &kernel_parm, &sparm, &init_spl_weight, &spl_factor, &using_argmax); 
+                      &learn_parm, &kernel_parm, &sparm, &init_spl_weight, &spl_factor); 
 
   epsilon = learn_parm.eps;
   C = learn_parm.svm_c;
@@ -1207,7 +1206,7 @@ int main(int argc, char* argv[]) {
   /* prepare feature vector cache for correct labels with imputed latent variables */
   fycache = (SVECTOR**)malloc(m*sizeof(SVECTOR*));
   for (i=0;i<m;i++) {
-	if (using_argmax) {
+	if (sparm.using_argmax) {
 		fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
 		diff = add_list_ss(fy);
 		free_svector(fy);
@@ -1237,7 +1236,7 @@ int main(int argc, char* argv[]) {
    		}
 	    for (i=0;i<m;i++) {
   	    free_svector(fycache[i]);
-    	  if (using_argmax) {
+    	  if (sparm.using_argmax) {
     	    fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
      	    diff = add_list_ss(fy);
           free_svector(fy);
@@ -1345,7 +1344,7 @@ int main(int argc, char* argv[]) {
     /* re-compute feature vector cache */
     for (i=0;i<m;i++) {
       free_svector(fycache[i]);
-      if (using_argmax) {
+      if (sparm.using_argmax) {
         fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
         diff = add_list_ss(fy);
         free_svector(fy);
@@ -1410,7 +1409,7 @@ int main(int argc, char* argv[]) {
 
 
 
-void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* modelfile, char *examplesfile, char *timefile, char *latentfile,char *slackfile, char *uncertaintyfile, char *noveltyfile, char *lossfile,LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm,double *init_spl_weight, double *spl_factor, int * using_argmax) {
+void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* modelfile, char *examplesfile, char *timefile, char *latentfile,char *slackfile, char *uncertaintyfile, char *noveltyfile, char *lossfile,LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm,double *init_spl_weight, double *spl_factor) {
   
   long i;
 	char filestub[1024];
@@ -1438,17 +1437,14 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
   struct_parm->reduced_size = 0;
   struct_parm->init_valid_fraction_pos = 0.0;
   struct_parm->margin_type = 0;
+	struct_parm->using_argmax = 1; // 0 means use expectation, 1 means argmax
 
   struct_parm->custom_argc=0;
-
-
-	/*CHANGE THIS SO THAT IT SETS using_argmax TO WHATEVER THE USER WANTS IT TO BE!!!*/
-	*using_argmax = 1; // 0 means use expectation, 1 means argmax
 	/*-------------------------------------------------------------------------------*/
 
   for(i=1;(i<argc) && ((argv[i])[0] == '-');i++) {
     switch ((argv[i])[1]) {
-    case 'a': i++; *using_argmax=atoi(argv[i]); break;
+    case 'a': i++; struct_parm->using_argmax=atoi(argv[i]); break;
     case 'c': i++; learn_parm->svm_c=atof(argv[i]); break;
     case 'd': i++; kernel_parm->poly_degree=atol(argv[i]); break;
     case 'e': i++; learn_parm->eps=atof(argv[i]); break;
