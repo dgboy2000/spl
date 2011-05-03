@@ -27,6 +27,66 @@
 #define MAX(x,y) ((x) < (y) ? (y) : (x))
 #define MIN(x,y) ((x) > (y) ? (y) : (x))
 
+
+
+
+inline int base2int(char base) {
+  int ans;
+  switch (base) {
+    case 'A': ans=0; break;
+    case 'a': ans=0; break;
+    case 'C': ans=1; break;
+    case 'c': ans=1; break;
+    case 'G': ans=2; break;
+    case 'g': ans=2; break;
+    case 'T': ans=3; break;
+    case 't': ans=3; break;
+    default: printf("ERROR: Unrecognized nucleotide '%c'\n!", base); assert(0);
+  }
+
+  return(ans);
+}
+
+static double
+compute_psi_diff_score (PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int h_position)
+{
+  double score;
+  int *pattern_hash, j;
+  
+  pattern_hash = sm->pattern_hash[x.example_id];
+  
+  score = 0.0;
+  for (j=h_position; j<h_position+sparm->motif_length; j++) {
+    score += sm->w[sm->sizePsi-(4*(j-h_position)+base2int(x.sequence[j]))];
+    score -= sm->w[1+pattern_hash[j]];
+  }
+  return score;
+}
+
+// Assuming the y=-1 label has score 0, compute the relative scores of the y=1 hidden variable locations
+static void
+find_argmax_hbar (PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, double *max_score, int *max_pos) {
+  double score;
+  int h;
+    
+  *max_score = -1E10;
+  *max_pos = -1;
+  
+  for (h=0;h<x.length-sparm->motif_length-sparm->bg_markov_order;h++) {
+    score = compute_psi_diff_score(x, sm, sparm, h);
+    if (score>*max_score) {
+      *max_score = score;
+      *max_pos = h;
+    }
+  }
+}
+
+
+
+
+
+
+
 SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm) {
 /*
   Read input examples {(x_1,y_1),...,(x_n,y_n)} from file.
@@ -112,23 +172,6 @@ SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm) {
   fclose(fp);  
 
   return(sample); 
-}
-
-inline int base2int(char base) {
-  int ans;
-  switch (base) {
-    case 'A': ans=0; break;
-    case 'a': ans=0; break;
-    case 'C': ans=1; break;
-    case 'c': ans=1; break;
-    case 'G': ans=2; break;
-    case 'g': ans=2; break;
-    case 'T': ans=3; break;
-    case 't': ans=3; break;
-    default: printf("ERROR: Unrecognized nucleotide '%c'\n!", base); assert(0);
-  }
-
-  return(ans);
 }
 
 void init_struct_model(SAMPLE sample, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, LEARN_PARM *lparm, KERNEL_PARM *kparm) {
@@ -283,67 +326,19 @@ void classify_struct_example(PATTERN x, LABEL *y, LATENT_VAR *h, STRUCTMODEL *sm
   pointers *y and *h. 
 */
   
-  double max_score, score;
-  int *pattern_hash, max_pos,j,k;
+  double max_score;
+  int max_pos;
   
   //y = (LABEL*)malloc(sizeof(LABEL));
   //h = (LATENT_VAR*)malloc(sizeof(LATENT_VAR));
-
-  pattern_hash = sm->pattern_hash[x.example_id];
   
-  max_score = 0.0;
-  max_pos = -1;
-  for (k=0;k<x.length-sparm->motif_length-sparm->bg_markov_order;k++) {
-    score = 0.0;
-    for (j=k;j<k+sparm->motif_length;j++) {
-      score += sm->w[sm->sizePsi-(4*(j-k)+base2int(x.sequence[j]))];
-      score -= sm->w[1+pattern_hash[j]];
-    }
-    if (score>max_score) {
-      max_score = score;
-      max_pos = k;
-    }
-  }
+  find_argmax_hbar (x, sm, sparm, &max_score, &max_pos);
   
   h->position = max_pos; 
   if (max_pos>-1) {
     y->label = 1;
   } else {
     y->label = -1;
-  }
-}
-
-static double
-compute_psi_diff_score (PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int h_position)
-{
-  double score;
-  int *pattern_hash, j;
-  
-  pattern_hash = sm->pattern_hash[x.example_id];
-  
-  score = 0.0;
-  for (j=h_position; j<h_position+sparm->motif_length; j++) {
-    score += sm->w[sm->sizePsi-(4*(j-h_position)+base2int(x.sequence[j]))];
-    score -= sm->w[1+pattern_hash[j]];
-  }
-  return score;
-}
-
-// Assuming the y=-1 label has score 0, compute the relative scores of the y=1 hidden variable locations
-static void
-find_argmax_hbar (PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, double *max_score, int *max_pos) {
-  double score;
-  int h;
-    
-  *max_score = -1E10;
-  *max_pos = -1;
-  
-  for (h=0;h<x.length-sparm->motif_length-sparm->bg_markov_order;h++) {
-    score = compute_psi_diff_score(x, sm, sparm, h);
-    if (score>*max_score) {
-      *max_score = score;
-      *max_pos = h;
-    }
   }
 }
 
@@ -428,19 +423,10 @@ void get_latent_variable_scores(PATTERN x, LABEL y, double *scores, STRUCTMODEL 
     return;
   }
 
-  int *pattern_hash, max_pos,j,h;
-  double score;
-
-  pattern_hash = sm->pattern_hash[x.example_id];
+  int h;
   
-  for (h=0;h<x.length-sparm->motif_length-sparm->bg_markov_order;h++) {
-    score = 0.0;
-    for (j=h;j<h+sparm->motif_length;j++) {
-      score += sm->w[sm->sizePsi-(4*(j-h)+base2int(x.sequence[j]))];
-      score -= sm->w[1+pattern_hash[j]];
-    }
-    scores[h] = score;
-  }
+  for (h=0;h<x.length-sparm->motif_length-sparm->bg_markov_order;h++)
+    scores[h] = compute_psi_diff_score(x, sm, sparm, h);
 }
 
 LATENT_VAR infer_latent_variables(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
@@ -451,28 +437,13 @@ LATENT_VAR infer_latent_variables(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LE
 
   LATENT_VAR h;
 
-  double max_score, score;
-  int *pattern_hash, max_pos,j,k;
-  
-  pattern_hash = sm->pattern_hash[x.example_id];
-  
+  double max_score;
+  int max_pos;
+    
   if (y.label==-1) { // no motif
     h.position = -1;
   } else {
-    /* find out highest scoring position */
-    max_score = -1E10;
-    max_pos = -1;
-    for (k=0;k<x.length-sparm->motif_length-sparm->bg_markov_order;k++) {
-      score = 0.0;
-      for (j=k;j<k+sparm->motif_length;j++) {
-        score += sm->w[sm->sizePsi-(4*(j-k)+base2int(x.sequence[j]))];
-        score -= sm->w[1+pattern_hash[j]];
-      }
-      if (score>max_score) {
-        max_score = score;
-        max_pos = k;
-      }
-    }
+    find_argmax_hbar (x, sm, sparm, &max_score, &max_pos);
     h.position = max_pos;
   }
 

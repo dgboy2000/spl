@@ -48,7 +48,7 @@
 
 int mosek_qp_optimize(double**, double*, double*, long, double, double*);
 
-void my_read_input_parameters(int argc, char* argv[], char *trainfile,char *modelfile, char *examplesfile, char *timefile, char *latentfile,char *slackfile, char *uncertaintyfile, char *noveltyfile, char*lossfile,LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm,STRUCT_LEARN_PARM *struct_parm, double *init_spl_weight, double*spl_factor);
+void my_read_input_parameters(int argc, char* argv[], char *trainfile,char *modelfile, char *examplesfile, char *timefile, char *latentfile,char *slackfile, char *uncertaintyfile, char *noveltyfile, char*lossfile, char*fycachefile,LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm,STRUCT_LEARN_PARM *struct_parm, double *init_spl_weight, double*spl_factor);
 
 void my_wait_any_key();
 
@@ -73,6 +73,22 @@ void add_vector_nn(double *w, double *dense_x, long n, double factor) {
   for (i=1;i<n+1;i++) {
     w[i]+=factor*dense_x[i];
   }
+}
+
+// log_svector (file *, "fycache for asdf: ", asdf);
+void log_fycache (FILE *f, SVECTOR **fycache, int m, int iter)
+{
+  WORD *w;
+  int i,j;
+  
+  for (i=0; i<m; ++i)
+    {
+      fprintf (f, "iter %d example %d:", iter, i);
+      w = fycache[i]->words;
+      for (j=0; w[j].wnum > 0; ++j)
+        fprintf (f, " %d:%f", w[j].wnum, w[j].weight);
+      fprintf (f, "\n");
+    }
 }
 
 double* add_list_nn(SVECTOR *a, long totwords) 
@@ -777,20 +793,46 @@ double * get_h_probabilities(PATTERN x, LABEL y, int numPositions, double Asigm,
   get_latent_variable_scores(x, y, hvScores, sm, sparm); 
   double scoreSum = 0.0;
   long j;
+  
+  // // TODO: remove
+  // double max_score = -1E10;
+  // int max_pos = -1;
+    
   for(j = 0; j < numPositions; j++) {
     hvScores[j] = 1/(1+exp(Asigm*hvScores[j]));
     scoreSum += hvScores[j];
+    
+    // // TODO: remove
+    // if (hvScores[j] > max_score) {
+    //   max_score = hvScores[j];
+    //   max_pos = j;
+    // }
+    
   }
   for(j = 0; j < numPositions; j++) {
     hvScores[j] /= scoreSum;
   }
+  
+  // // TODO: remove
+  // for(j = 0; j < numPositions; j++) {
+  //   hvScores[j] = (j == max_pos ? 1 : 0);
+  // }
+  
 	return hvScores;
 }
 
 SVECTOR * get_expected_psih(PATTERN x, LABEL y, int numPositions, double Asigm, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
-	double * hvScores = get_h_probabilities(x, y, numPositions, Asigm, sm, sparm);
+  double * hvScores;
 	long j;
 	LATENT_VAR h;
+	
+  if (y.label == -1)
+    {
+      h.position = -1;
+      return psi(x, y, h, sm, sparm);
+    }
+	
+	hvScores = get_h_probabilities(x, y, numPositions, Asigm, sm, sparm);
 	h.position = 0;
 	SVECTOR * psih = psi(x, y, h, sm, sparm);
 	SVECTOR * expected_psih = smult_s(psih, hvScores[0]);
@@ -1125,6 +1167,7 @@ int main(int argc, char* argv[]) {
   char uncertaintyfile[1024];
   char noveltyfile[1024];
   char lossfile[1024];
+  char fycachefile[1024];
   int MAX_ITER;
   /* new struct variables */
   SVECTOR **fycache, *diff, *fy;
@@ -1148,7 +1191,7 @@ int main(int argc, char* argv[]) {
      
   double *slacks, *entropies, *novelties, *losses;
   /* read input parameters */
-	my_read_input_parameters(argc, argv, trainfile, modelfile, examplesfile, timefile, latentfile, slackfile, uncertaintyfile, noveltyfile, lossfile,
+	my_read_input_parameters(argc, argv, trainfile, modelfile, examplesfile, timefile, latentfile, slackfile, uncertaintyfile, noveltyfile, lossfile, fycachefile,
                       &learn_parm, &kernel_parm, &sparm, &init_spl_weight, &spl_factor); 
 
   epsilon = learn_parm.eps;
@@ -1203,19 +1246,18 @@ int main(int argc, char* argv[]) {
   //   }
   // }
 
+  // FILE *ffycache = fopen(fycachefile,"w");
+
   /* prepare feature vector cache for correct labels with imputed latent variables */
   fycache = (SVECTOR**)malloc(m*sizeof(SVECTOR*));
   for (i=0;i<m;i++) {
-	if (sparm.using_argmax) {
-		fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
-		diff = add_list_ss(fy);
-		free_svector(fy);
-		fy = diff;
-		fycache[i] = fy;
-	} else {
-		fycache[i] = get_expected_psih(ex[i].x, ex[i].y, get_num_latent_variable_options(ex[i].x, ex[i].y, &sm, &sparm), ASIGM, &sm, &sparm);
-	}
+  	fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
+  	diff = add_list_ss(fy);
+  	free_svector(fy);
+  	fy = diff;
+  	fycache[i] = fy;
   }
+  // log_fycache (ffycache, fycache, m, -3);
 
  	/* learn initial weight vector using all training examples */
 	valid_examples = (int *) malloc(m*sizeof(int));
@@ -1236,27 +1278,28 @@ int main(int argc, char* argv[]) {
    		}
 	    for (i=0;i<m;i++) {
   	    free_svector(fycache[i]);
-    	  if (sparm.using_argmax) {
+        // if (sparm.using_argmax) {
     	    fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
      	    diff = add_list_ss(fy);
           free_svector(fy);
           fy = diff;
           fycache[i] = fy;
-        } else {
-          fycache[i] = get_expected_psih(ex[i].x, ex[i].y, get_num_latent_variable_options(ex[i].x, ex[i].y, &sm, &sparm), ASIGM, &sm, &sparm);
-        }
+        // } else {
+        //   fycache[i] = get_expected_psih(ex[i].x, ex[i].y, get_num_latent_variable_options(ex[i].x, ex[i].y, &sm, &sparm), ASIGM, &sm, &sparm);
+        // }
     	}
+      // log_fycache (ffycache, fycache, m, initIter-2);
 		}
 	}
 	
-	{
-  int i;
-  for (i=0; i<sm.sizePsi; ++i)
-    {
-      // printf ("w[%d] = %f\n", i, w[i]);
-      // printf ("sm.w[%d] = %f\n", i, sm.w[i]);
-    }
-  }
+  // {
+  //   int i;
+  //   for (i=0; i<sm.sizePsi; ++i)
+  //     {
+  //       // printf ("w[%d] = %f\n", i, w[i]);
+  //       // printf ("sm.w[%d] = %f\n", i, sm.w[i]);
+  //     }
+  //   }
      
   /* outer loop: latent variable imputation */
   outer_iter = 0;
@@ -1354,6 +1397,7 @@ int main(int argc, char* argv[]) {
         fycache[i] = get_expected_psih(ex[i].x, ex[i].y, get_num_latent_variable_options(ex[i].x, ex[i].y, &sm, &sparm), ASIGM, &sm, &sparm);
       }
     }
+    // log_fycache (ffycache, fycache, m, outer_iter);
 		sprintf(itermodelfile,"%s.%04d",modelfile,outer_iter);
 		write_struct_model(itermodelfile, &sm, &sparm);
 
@@ -1378,6 +1422,7 @@ int main(int argc, char* argv[]) {
   fclose(fentropy);
   fclose(fnovelty);
   fclose(floss);
+  // fclose(ffycache);
   free(slacks);
   free(entropies);
   free(novelties);
@@ -1409,7 +1454,7 @@ int main(int argc, char* argv[]) {
 
 
 
-void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* modelfile, char *examplesfile, char *timefile, char *latentfile,char *slackfile, char *uncertaintyfile, char *noveltyfile, char *lossfile,LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm,double *init_spl_weight, double *spl_factor) {
+void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* modelfile, char *examplesfile, char *timefile, char *latentfile,char *slackfile, char *uncertaintyfile, char *noveltyfile, char *lossfile, char *fycachefile, LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm,double *init_spl_weight, double *spl_factor) {
   
   long i;
 	char filestub[1024];
@@ -1436,7 +1481,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
   struct_parm->print_extensive = 0;
   struct_parm->reduced_size = 0;
   struct_parm->init_valid_fraction_pos = 0.0;
-  struct_parm->margin_type = 0;
+  struct_parm->margin_type = 0; // 0 means margin rescaling, 1 means opposite y
 	struct_parm->using_argmax = 1; // 0 means use expectation, 1 means argmax
 
   struct_parm->custom_argc=0;
@@ -1499,6 +1544,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
   sprintf(uncertaintyfile,"%s.entropy",filestub);
   sprintf(noveltyfile,"%s.novelty",filestub);
   sprintf(lossfile,"%s.loss",filestub);
+	sprintf(fycachefile,"%s.fycache",filestub);
 
 	/* self-paced learning weight should be non-negative */
 	if(*init_spl_weight < 0.0)
