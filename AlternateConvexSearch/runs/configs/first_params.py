@@ -5,7 +5,7 @@ params = {
     'seeds' : [ '0000', '1000', '2000', '3000' ],
     
     'name' : 'control',
-    'extension' : '2011-04-28_15:05:00', # Set this to 'datetime' to make a new run or a specific string to continue an old one
+    'extension' : '2011-05-03', # Set this to 'datetime' to make a new run or a specific string to continue an old one
     'description' : """
 This control run covers cccp, slack, and uncertainty for the existing algorithms.
         """,

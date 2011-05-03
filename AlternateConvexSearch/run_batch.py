@@ -11,7 +11,8 @@ print sys.argv
 assert len(sys.argv) == 2, "Correct usage is python run_batch.py [params file]"
 execfile(sys.argv[1])
 
-make_cmd = "make clean && ./run_make"
+# make_cmd = "make clean && ./run_make"
+make_cmd = "./run_make"
 status = os.system(make_cmd)
 if status:
   print "MAKE COMMAND FAILED: "+make_cmd
@@ -82,7 +83,7 @@ for alg_name,param_pair in params['param_pairs'].iteritems():
         test_inference_job = "./svm_motif_classify %s %s %s"\
           %(test_data, training_model, test_error_file)
 
-        seed_jobs[seed] = [training_job, training_inference_job, test_inference_job]
+        seed_jobs[seed] = [training_job, training_inference_job, test_inference_job, training_model]
 
 
 def mean(a):
@@ -107,7 +108,13 @@ for alg_name, alg_jobs in jobs.iteritems():
       for seed, seed_jobs in fold_jobs.iteritems():
         
         try:
-          job_cmd = ' && '.join(seed_jobs)
+          model_file = seed_jobs[3]
+          job_cmd = ''
+          if os.path.exists(model_file):
+            print "Model file %s exists; skipping learning" %model_file
+            job_cmd = ' && '.join(seed_jobs[1:3])
+          else:
+            job_cmd = ' && '.join(seed_jobs[0:3])
         except TypeError:
           import pdb; pdb.set_trace()
         print "Executing the following command: %s\n" %job_cmd
