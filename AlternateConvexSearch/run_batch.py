@@ -28,6 +28,7 @@ RUN_ROOT = 'runs/output/%s' %dir_name
 
 if os.path.exists(RUN_ROOT):
   # raw_input("WARNING: run directory %s already exists!  Press enter to continue working in this directory or Ctrl-C to quit" %RUN_ROOT)
+  print "WARNING: run directory %s already exists!  Press enter to continue working in this directory or Ctrl-C to quit" %RUN_ROOT
 else:
   os.mkdir(RUN_ROOT)
 
