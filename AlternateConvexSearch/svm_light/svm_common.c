@@ -453,11 +453,11 @@ SVECTOR* smult_s(SVECTOR *a, double factor)
     sumi=sum;
     ai=a->words;
     while (ai->wnum) {
-	(*sumi)=(*ai);
-	sumi->weight*=factor;
-	if(sumi->weight != 0)
-	  sumi++;
-	ai++;
+      (*sumi)=(*ai);
+      sumi->weight*=factor;
+      if(sumi->weight != 0)
+        sumi++;
+      ai++;
     }
     sumi->wnum=0;
 

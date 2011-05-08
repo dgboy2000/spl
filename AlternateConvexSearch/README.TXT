@@ -1,4 +1,4 @@
-Make with ./run_make
+Make with ./run_make script, which must be ported to your system by adding the correct paths to your mosek files.
 
 
 Code for Discriminative Motif Finding, implemented using the Latent Structural SVM API (June 4 2009)

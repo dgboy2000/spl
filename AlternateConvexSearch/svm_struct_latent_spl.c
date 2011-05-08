@@ -799,8 +799,14 @@ double * get_h_probabilities(PATTERN x, LABEL y, int numPositions, double Asigm,
   // int max_pos = -1;
     
   for(j = 0; j < numPositions; j++) {
+    
+    // SIGMOID
     hvScores[j] = 1/(1+exp(Asigm*hvScores[j]));
     scoreSum += hvScores[j];
+    
+    // // BOLTZMANN
+    // hvScores[j] = exp(-Asigm*hvScores[j]);
+    // scoreSum += hvScores[j];
     
     // // TODO: remove
     // if (hvScores[j] > max_score) {
@@ -815,7 +821,7 @@ double * get_h_probabilities(PATTERN x, LABEL y, int numPositions, double Asigm,
   
   // // TODO: remove
   // for(j = 0; j < numPositions; j++) {
-  //   hvScores[j] = (j == max_pos ? 1 : 0);
+  //   hvScores[j] = (j == max_pos ? 1 : 1E-10);
   // }
   
 	return hvScores;
@@ -833,6 +839,7 @@ SVECTOR * get_expected_psih(PATTERN x, LABEL y, int numPositions, double Asigm, 
     }
 	
 	hvScores = get_h_probabilities(x, y, numPositions, Asigm, sm, sparm);
+  // printf ("Just computed hv score %f for h=0\n", hvScores[0]);
 	h.position = 0;
 	SVECTOR * psih = psi(x, y, h, sm, sparm);
 	SVECTOR * expected_psih = smult_s(psih, hvScores[0]);
@@ -1366,7 +1373,7 @@ int main(int argc, char* argv[]) {
 			printf("decrement: N/A\n"); fflush(stdout);
 		}
     
-    stop_crit = (decrement<C*epsilon);
+    stop_crit = (abs (decrement) < C*epsilon);
 		/* additional stopping criteria */
 		if(nValid < m)
 			stop_crit = 0;
