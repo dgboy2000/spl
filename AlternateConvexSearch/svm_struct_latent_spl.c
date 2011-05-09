@@ -44,7 +44,7 @@
 
 #define DEBUG_LEVEL 0
 
-#define ASIGM -1.5
+#define ASIGM -15000//-1.5
 
 int mosek_qp_optimize(double**, double*, double*, long, double, double*);
 
@@ -58,6 +58,45 @@ int resize_cleanup(int size_active, int **ptr_idle, double **ptr_alpha, double *
 void approximate_to_psd(double **G, int size_active, double eps);
 
 void Jacobi_Cyclic_Method(double eigenvalues[], double *eigenvectors, double *A, int n);
+
+int compare_dbl (const void * a, const void * b)
+{
+  double c = *(double*)a;
+  double d = *(double*)b;
+  if (c < d)
+    return -1;
+  if (c == d)
+    return 0;
+  if (c > d)
+    return 1; 
+}
+
+double array_max (double *array, int numElts)
+{
+  double max = array[0];
+  int i;
+  for (i=1; i<numElts; ++i)
+    max = MAX(array[i], max);
+  return max;
+}
+
+double array_min (double *array, int numElts)
+{
+  double min = array[0];
+  int i;
+  for (i=1; i<numElts; ++i)
+    min = MIN(array[i], min);
+  return min;
+}
+
+double array_median (double *array, int numElts)
+{
+  double * array_copy = calloc (numElts, sizeof (double));
+  memcpy (array_copy, array, numElts);
+  qsort (array_copy, numElts, sizeof (double), compare_dbl);
+  
+  return array[(numElts-1) / 2];
+}
 
 double sprod_nn(double *a, double *b, long n) {
   double ans=0.0;
@@ -794,35 +833,47 @@ double * get_h_probabilities(PATTERN x, LABEL y, int numPositions, double Asigm,
   double scoreSum = 0.0;
   long j;
   
-  // // TODO: remove
-  // double max_score = -1E10;
-  // int max_pos = -1;
+  // TODO: remove
+  double max_score = -1E10;
+  int max_pos = -1;
+  
+  // double minScore = array_min (hvScores, numPositions);
+  // double medianScore = array_median (hvScores, numPositions);
+  // double maxScore = array_max (hvScores, numPositions);
+  // double tmp;
     
   for(j = 0; j < numPositions; j++) {
     
-    // SIGMOID
-    hvScores[j] = 1/(1+exp(Asigm*hvScores[j]));
-    scoreSum += hvScores[j];
-    
-    // // BOLTZMANN
-    // hvScores[j] = exp(-Asigm*hvScores[j]);
+    // // SIGMOID or BOLTZMANN if const is 1 or 0
+    // hvScores[j] = 1/(0+exp(Asigm*hvScores[j]));
     // scoreSum += hvScores[j];
     
-    // // TODO: remove
-    // if (hvScores[j] > max_score) {
-    //   max_score = hvScores[j];
-    //   max_pos = j;
-    // }
+    // // SQUARED approach, scale invariant (next, subtract median)    
+    // hvScores[j] = (hvScores[j] - minScore + 1E-10) * (hvScores[j] - minScore + 1E-10);
+    // scoreSum += hvScores[j];
+    
+    // // RESCALING approach, scale invariant (next, subtract median) 
+    // hvScores[j] = exp ((hvScores[j] - medianScore) / (maxScore - medianScore + 1E-10) * 10);
+    // if (hvScores[j] == hvScores[j])
+    //   scoreSum += hvScores[j];
+    // else
+    //   printf ("Whos your daddy\n"); // TODO: watch potty mouth
+    
+    // TODO: remove
+    if (hvScores[j] > max_score) {
+      max_score = hvScores[j];
+      max_pos = j;
+    }
     
   }
-  for(j = 0; j < numPositions; j++) {
-    hvScores[j] /= scoreSum;
-  }
-  
-  // // TODO: remove
   // for(j = 0; j < numPositions; j++) {
-  //   hvScores[j] = (j == max_pos ? 1 : 1E-10);
+  //   hvScores[j] /= scoreSum;
   // }
+  
+  // TODO: remove
+  for(j = 0; j < numPositions; j++) {
+    hvScores[j] = (j == max_pos ? 1 : 1E-10);
+  }
   
 	return hvScores;
 }
