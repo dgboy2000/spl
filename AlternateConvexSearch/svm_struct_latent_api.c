@@ -332,10 +332,9 @@ void classify_struct_example(PATTERN x, LABEL *y, LATENT_VAR *h, STRUCTMODEL *sm
   //y = (LABEL*)malloc(sizeof(LABEL));
   //h = (LATENT_VAR*)malloc(sizeof(LATENT_VAR));
   
-  find_argmax_hbar (x, sm, sparm, &max_score, &max_pos);
-  
-  h->position = max_pos; 
-  if (max_pos>-1) {
+  find_argmax_hbar (x, sm, sparm, &max_score, &max_pos); //this only finds the best non-negative hbar
+  h->position = (max_score>0.0) ? max_pos : -1; 
+  if (max_score>0.0) {
     y->label = 1;
   } else {
     y->label = -1;

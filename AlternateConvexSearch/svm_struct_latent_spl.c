@@ -794,35 +794,35 @@ double * get_h_probabilities(PATTERN x, LABEL y, int numPositions, double Asigm,
   double scoreSum = 0.0;
   long j;
   
-  // // TODO: remove
-  // double max_score = -1E10;
-  // int max_pos = -1;
+    // TODO: remove
+    double max_score = -1E10;
+    int max_pos = -1;
     
   for(j = 0; j < numPositions; j++) {
     
-    // SIGMOID
-    hvScores[j] = 1/(1+exp(Asigm*hvScores[j]));
-    scoreSum += hvScores[j];
+    //  // SIGMOID
+    // hvScores[j] = 1/(1+exp(Asigm*hvScores[j]));
+    // scoreSum += hvScores[j];
     
     // // BOLTZMANN
     // hvScores[j] = exp(-Asigm*hvScores[j]);
     // scoreSum += hvScores[j];
     
-    // // TODO: remove
-    // if (hvScores[j] > max_score) {
-    //   max_score = hvScores[j];
-    //   max_pos = j;
-    // }
+     // TODO: remove
+     if (hvScores[j] > max_score) {
+       max_score = hvScores[j];
+       max_pos = j;
+     }
     
   }
-  for(j = 0; j < numPositions; j++) {
-    hvScores[j] /= scoreSum;
-  }
+  //for(j = 0; j < numPositions; j++) {
+  //  hvScores[j] /= scoreSum;
+  //}
   
-  // // TODO: remove
-  // for(j = 0; j < numPositions; j++) {
-  //   hvScores[j] = (j == max_pos ? 1 : 1E-10);
-  // }
+   // TODO: remove
+   for(j = 0; j < numPositions; j++) {
+     hvScores[j] = (j == max_pos ? 1 : 1E-10);
+   }
   
 	return hvScores;
 }
