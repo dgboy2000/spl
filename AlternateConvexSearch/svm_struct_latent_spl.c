@@ -46,6 +46,11 @@
 
 #define ASIGM -1.5
 
+
+//#define SECOND_PROP 0.05
+//#define DELAY 3
+
+
 int mosek_qp_optimize(double**, double*, double*, long, double, double*);
 
 void my_read_input_parameters(int argc, char* argv[], char *trainfile,char *modelfile, char *examplesfile, char *timefile, char *latentfile,char *slackfile, char *uncertaintyfile, char *noveltyfile, char*lossfile, char*fycachefile,LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm,STRUCT_LEARN_PARM *struct_parm, double *init_spl_weight, double*spl_factor);
@@ -791,40 +796,72 @@ double get_entropy(double *distrib, int numEntries) {
 double * get_h_probabilities(PATTERN x, LABEL y, int numPositions, double Asigm, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
   double * hvScores = malloc(numPositions * sizeof(double));
   get_latent_variable_scores(x, y, hvScores, sm, sparm); 
+
+  //just to be safe
+  if (y.label == -1) {
+    hvScores[0] = 1.0;
+    return hvScores;
+  }
   double scoreSum = 0.0;
   long j;
   
-    // TODO: remove
-    double max_score = -1E10;
-    int max_pos = -1;
-    
+   // TODO: remove
+   double max_score = -1E10;
+   int max_pos = -1;
+  
+   // //TOP TWO
+   //double second_max_score = -1E10;
+   //int second_max_pos = -1;
+ 
   for(j = 0; j < numPositions; j++) {
     
-    //  // SIGMOID
-    // hvScores[j] = 1/(1+exp(Asigm*hvScores[j]));
-    // scoreSum += hvScores[j];
+      // SIGMOID
+      hvScores[j] = 1/(1+exp(Asigm*hvScores[j]));
+      scoreSum += hvScores[j];
     
     // // BOLTZMANN
     // hvScores[j] = exp(-Asigm*hvScores[j]);
     // scoreSum += hvScores[j];
     
-     // TODO: remove
-     if (hvScores[j] > max_score) {
-       max_score = hvScores[j];
-       max_pos = j;
-     }
+    // TODO: remove
+    //if (hvScores[j] > max_score) {
+     //  max_score = hvScores[j];
+     //  max_pos = j;
+     //}
     
+      ////TOP TWO
+    //if (hvScores[j] > second_max_score) {
+    //  if (hvScores[j] > max_score) {
+      //second_max_score = max_score;
+      //second_max_pos = max_pos;
+      //max_score = hvScores[j];
+      //max_pos = j;
+      //} else {
+      //	second_max_score = hvScores[j];
+      //	second_max_pos = j;
+      //}
+      //}
   }
+
+  for(j = 0; j < numPositions; j++) {
+    hvScores[j] /= scoreSum;
+  }
+  
+  // // TODO: remove
   //for(j = 0; j < numPositions; j++) {
-  //  hvScores[j] /= scoreSum;
+  //  hvScores[j] = (j == max_pos ? 1 : 1E-10);
   //}
-  
-   // TODO: remove
-   for(j = 0; j < numPositions; j++) {
-     hvScores[j] = (j == max_pos ? 1 : 1E-10);
-   }
-  
-	return hvScores;
+
+  //// TOP TWO
+  //for (j = 0; j < numPositions; j++) {
+  //  hvScores[j] = 0.0;
+  //  if (j == max_pos) {
+  //    hvScores[j] = 1.0 - SECOND_PROP;
+  //  } else if (j == second_max_pos) {
+  //    hvScores[j] = SECOND_PROP;
+  //  }
+  //}
+  return hvScores;
 }
 
 SVECTOR * get_expected_psih(PATTERN x, LABEL y, int numPositions, double Asigm, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
@@ -1394,7 +1431,7 @@ int main(int argc, char* argv[]) {
     /* re-compute feature vector cache */
     for (i=0;i<m;i++) {
       free_svector(fycache[i]);
-      if (sparm.using_argmax) {
+      if (sparm.using_argmax || outer_iter) {
         fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
         diff = add_list_ss(fy);
         free_svector(fy);
