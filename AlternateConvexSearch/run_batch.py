@@ -28,7 +28,7 @@ RUN_ROOT = 'runs/output/%s' %dir_name
 
 if os.path.exists(RUN_ROOT):
   # raw_input("WARNING: run directory %s already exists!  Press enter to continue working in this directory or Ctrl-C to quit" %RUN_ROOT)
-  print "WARNING: run directory %s already exists!  Press enter to continue working in this directory or Ctrl-C to quit" %RUN_ROOT
+  print "WARNING: run directory %s already exists!  Skipping learning of existing models..." %RUN_ROOT
 else:
   os.mkdir(RUN_ROOT)
 
@@ -143,7 +143,7 @@ print "\n".join(summary_stats)
 stats_filename = RUN_ROOT+'/STATS'
 STATS_FILE = open(stats_filename, 'w')
 STATS_FILE.write("\n".join(summary_stats))
-STATS_FILE.write(str(stats))
+STATS_FILE.write("\n\n"+str(stats)+"\n")
 STATS_FILE.close()
         
 
