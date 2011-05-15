@@ -1,0 +1,4 @@
+Reading model...done.
+Reading test examples...done.
+Average loss on test set: 0.3139
+Zero/one error on test set: 0.3139
