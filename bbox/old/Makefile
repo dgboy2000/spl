@@ -9,11 +9,18 @@ LDFLAGS= -g
 #LDFLAGS= -O3
 #LDFLAGS = -O3 -pg
 LIBS= -lm
-MOSEK_H= /afs/cs.stanford.edu/u/pawan/Project/mosek/6/tools/platform/linux64x86/h/
+#MOSEK_H= /afs/cs.stanford.edu/u/pawan/Project/mosek/6/tools/platform/linux64x86/h/
 #MSKLINKFLAGS= -lirc -lguide -limf -lsvml -lunwind -lmosek64 -lpthread -lc -ldl -lm
-MSKLINKFLAGS= -lmosek64 -lpthread -lm
-MSKLIBPATH= /afs/cs.stanford.edu/u/pawan/Project/mosek/6/tools/platform/linux64x86/bin/
+#MSKLINKFLAGS= -lmosek64 -lpthread -lm
+#MSKLIBPATH= /afs/cs.stanford.edu/u/pawan/Project/mosek/6/tools/platform/linux64x86/bin/
 SFMTPATH= ./SFMT-src-1.3.3
+
+# NOTES: the following variables rely on environment variables that must
+# be defined elsewhere                                                 
+MOSEK_H= $(MOSEK_ROOT)/h
+MSKLIBPATH= $(MOSEK_ROOT)/bin
+MSKLINKFLAGS= -l$(MOSEK_VERSION) -liomp5 -lpthread -lm
+
 
 all: svm_bbox_learn svm_bbox_classify
 
