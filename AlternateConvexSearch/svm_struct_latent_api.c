@@ -72,7 +72,7 @@ find_argmax_hbar (PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, double *
   *max_score = -1E10;
   *max_pos = -1;
   
-  numPositions = get_num_latent_variable_options (x, sm, sparm)
+  numPositions = get_num_latent_variable_options (x, sm, sparm);
   for (h=0; h < numPositions; h++) {
     score = compute_psi_diff_score(x, sm, sparm, h);
     if (score>*max_score) {
