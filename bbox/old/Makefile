@@ -29,7 +29,7 @@ clean:
 	rm -f svm_latent_learn svm_latent_classify
 
 svm_bbox_learn: svm_struct_latent_spl.o svm_common.o mosek_qp_optimize.o svm_struct_latent_api.o SFMT.o
-	$(LD) $(LDFLAGS) svm_struct_latent_spl.o svm_common.o mosek_qp_optimize.o SFMT.o svm_struct_latent_api.o -o svm_bbox_learn $(LIBS) -L $(MSKLIBPATH) $(MSKLINKFLAGS)
+	$(LD) $(LDFLAGS) svm_struct_latent_spl.o svm_common.o mosek_qp_optimize.o SFMT.o svm_struct_latent_api.o -o svm_bbox_learn $(LIBS) -L$(MSKLIBPATH) $(MSKLINKFLAGS)
 
 svm_bbox_classify: svm_struct_latent_classify.o svm_common.o svm_struct_latent_api.o SFMT.o
 	$(LD) $(LDFLAGS) svm_struct_latent_classify.o svm_common.o SFMT.o svm_struct_latent_api.o -o svm_bbox_classify $(LIBS)
