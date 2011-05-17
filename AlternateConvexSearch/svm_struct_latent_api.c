@@ -67,12 +67,13 @@ compute_psi_diff_score (PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, in
 static void
 find_argmax_hbar (PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, double *max_score, int *max_pos) {
   double score;
-  int h;
+  int h, numPositions;
     
   *max_score = -1E10;
   *max_pos = -1;
   
-  for (h=0;h<x.length-sparm->motif_length-sparm->bg_markov_order;h++) {
+  numPositions = get_num_latent_variable_options (x, sm, sparm)
+  for (h=0; h < numPositions; h++) {
     score = compute_psi_diff_score(x, sm, sparm, h);
     if (score>*max_score) {
       *max_score = score;
@@ -409,9 +410,14 @@ void find_most_violated_constraint_oppositey(EXAMPLE *ex, LABEL *ybar, LATENT_VA
 
 }
 
-int get_num_latent_variable_options(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+int get_num_latent_variable_options_HACK(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
   if (y.label == -1) return 1;
-  else return x.length-sparm->motif_length-sparm->bg_markov_order;
+  else return get_num_latent_variable_options (x, sm, sparm);
+}
+
+int
+get_num_latent_variable_options (PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+  return x.length - sparm->motif_length - sparm->bg_markov_order;
 }
 
 void get_latent_variable_scores(PATTERN x, LABEL y, double *scores, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
@@ -422,11 +428,58 @@ void get_latent_variable_scores(PATTERN x, LABEL y, double *scores, STRUCTMODEL 
     return;
   }
 
-  int h;
+  int h, numPositions;
   
-  for (h=0;h<x.length-sparm->motif_length-sparm->bg_markov_order;h++)
+  numPositions = get_num_latent_variable_options (x, sm, sparm);
+  for (h=0; h < numPositions; h++)
     scores[h] = compute_psi_diff_score(x, sm, sparm, h);
 }
+
+// Compute the joint probability distribution of yhat and hhat values for the specified example
+void
+get_yhat_hhat_probs (PATTERN x, LABEL y, double *correct_probs, double *incorrect_probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
+{
+  double *positive_probs, *negative_probs, lossval, sum;
+  int h, numPositions;
+  
+  if (y.label == 1)
+    {
+      positive_probs = correct_probs;
+      negative_probs = incorrect_probs;
+    }
+  else
+    {
+      positive_probs = incorrect_probs;
+      negative_probs = correct_probs; 
+    }
+    
+  sum = 0.0;
+  numPositions = get_num_latent_variable_options (x, sm, sparm);
+
+  // compute positive scores
+  lossval = (y.label == 1) ? 0 : DELTA;
+  for (h=0; h < numPositions; h++)
+    {
+      positive_probs[h] = exp (lossval + compute_psi_diff_score(x, sm, sparm, h));
+      sum += positive_probs[h];
+    }
+
+  // compute negative scores
+  lossval = (y.label == -1) ? 0 : DELTA;
+  for (h=0; h < numPositions; h++)
+    {
+      negative_probs[h] = exp (lossval);
+      sum += negative_probs[h];
+    }
+
+  // normalize the probabilities
+  for (h=0; h < numPositions; ++h)
+    {
+      positive_probs[h] /= sum;
+      negative_probs[h] /= sum;
+    }
+}
+
 
 LATENT_VAR infer_latent_variables(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
 /*
@@ -469,13 +522,13 @@ double loss(LABEL y, LABEL ybar, LATENT_VAR hbar, STRUCT_LEARN_PARM *sparm) {
   if (y.label==ybar.label) {
     return(0);
   } else {
-    return(1);
+    return(DELTA);
   }
 }
 
 void get_all_losses(EXAMPLE *ex, int exNum, double *losses, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
   long i;
-  int nMotifPositions = ex[exNum].x.length-sparm->motif_length-sparm->bg_markov_order;
+  int nMotifPositions = get_num_latent_variable_options (ex[exNum].x, sm, sparm);
   int nPairs = nMotifPositions + 1;
 
   LABEL y;
