@@ -99,6 +99,7 @@ typedef struct struct_learn_parm {
   double init_valid_fraction_pos;
   double uncertainty_weight;
   double novelty_weight;
+  double renyi_exponent;
   int print_extensive;
   int reduced_size;
   int margin_type;
