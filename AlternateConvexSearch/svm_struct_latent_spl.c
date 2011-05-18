@@ -1008,59 +1008,73 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
 		fybar = psi(ex[i].x,ybar,hbar,sm,sparm);
 		exampleScores[i].index = i;
 		lossval = loss(ex[i].y,ybar,hbar,sparm);
+		
 		difficulty = 0.0;
+		uncertainty = 0.0;
+		novelty = 0.0;
 		
-		for (f=fy;f;f=f->next) {
-			j = 0;
-			while (1) {
-				if(!f->words[j].wnum)
-					break;
-				difficulty -= sm->w[f->words[j].wnum]*f->words[j].weight;
-				j++;
-			}
-		}
-		for (f=fybar;f;f=f->next) {
-			j = 0;
-			while (1) {
-				if(!f->words[j].wnum)
-					break;
-				difficulty += sm->w[f->words[j].wnum]*f->words[j].weight;
-				j++;
-			}
-		}
 		
-    // {
-    //   // calculate the joint probs over yhat, hhat for point i
-    //   // save correct and incorrectly labeled parts of distribution
-    //       numPositions = get_num_latent_variable_options(ex[i].x, sm, sparm);
-    //       double *correct_probs = calloc (numPositions, sizeof (double));
-    //       double *incorrect_probs = calloc (numPositions, sizeof (double));
-    //       get_yhat_hhat_probs (ex[i].x, ex[i].y, correct_probs, incorrect_probs, sm, sparm);
-    //   
-    //   // compute entropy of each half
-    //       double correct_entropy = get_renyi_entropy (correct_probs, 1, numPositions);
-    //       double incorrect_entropy = get_renyi_entropy (incorrect_probs, 1, numPositions);
-    //   
-    //   // save result in the score
-    //       exampleScores[i].val = correct_entropy - incorrect_entropy;
+		if (sparm->renyi_exponent == -1.0)
+		  {
+		    for (f=fy;f;f=f->next) {
+    			j = 0;
+    			while (1) {
+    				if(!f->words[j].wnum)
+    					break;
+    				difficulty -= sm->w[f->words[j].wnum]*f->words[j].weight;
+    				j++;
+    			}
+    		}
+    		for (f=fybar;f;f=f->next) {
+    			j = 0;
+    			while (1) {
+    				if(!f->words[j].wnum)
+    					break;
+    				difficulty += sm->w[f->words[j].wnum]*f->words[j].weight;
+    				j++;
+    			}
+    		}
+    		
+    		exampleScores[i].val = lossval + difficulty;
+		  }
+		else if (sparm->renyi_exponent == 1.0)
+      {
+        // calculate the joint probs over yhat, hhat for point i
+        // save correct and incorrectly labeled parts of distribution
+        numPositions = get_num_latent_variable_options(ex[i].x, sm, sparm);
+        double *correct_probs = calloc (numPositions, sizeof (double));
+        double *incorrect_probs = calloc (numPositions, sizeof (double));
+        get_yhat_hhat_probs (ex[i].x, ex[i].y, correct_probs, incorrect_probs, sm, sparm);
+
+        // compute entropy of each half
+        double correct_entropy = get_renyi_entropy (correct_probs, 1, numPositions);
+        double incorrect_entropy = get_renyi_entropy (incorrect_probs, 1, numPositions);
+
+        exampleScores[i].val = correct_entropy - incorrect_entropy;
+      }
+    else if (sparm->renyi_exponent == -2.0)
+      {
+        numPositions = get_num_latent_variable_options_HACK(ex[i].x, ex[i].y, sm, sparm);
+  	    hvScores = get_h_probabilities(ex[i].x, ex[i].y, numPositions, ASIGM, sm, sparm);
+        uncertainty = get_entropy(hvScores, numPositions);
+        free(hvScores);
+
+    		exampleScores[i].val = lossval + uncertainty;
+      }
+    else if (sparm->renyi_exponent > 1.0)
+      printf ("ERROR: Renyi exponent %f not implemented yet\n", sparm->renyi_exponent);
+    else
+      printf ("ERROR: Invalid renyi exponent %f\n", sparm->renyi_exponent);
+
+    // if(noveltyWeight || sparm->print_extensive) {
+    //   novelty = get_novelty(ex,i,sm,sparm);
+    // } else {
+    //   novelty = 0.0;    
     // }
-    
-    if(uncertaintyWeight || sparm->print_extensive) {
-      numPositions = get_num_latent_variable_options_HACK(ex[i].x, ex[i].y, sm, sparm);
-	    hvScores = get_h_probabilities(ex[i].x, ex[i].y, numPositions, ASIGM, sm, sparm);
-      uncertainty = get_entropy(hvScores, numPositions);
-      free(hvScores);
-    } else {
-      uncertainty = 0.0;    
-    }
 
-    if(noveltyWeight || sparm->print_extensive) {
-      novelty = get_novelty(ex,i,sm,sparm);
-    } else {
-      novelty = 0.0;    
-    }
 
-		exampleScores[i].val = (uncertaintyWeight + difficultyWeight)*lossval + difficultyWeight * difficulty + uncertaintyWeight * uncertainty + noveltyWeight * novelty; //score!!
+      
+    // exampleScores[i].val = (uncertaintyWeight + difficultyWeight)*lossval + difficultyWeight * difficulty + uncertaintyWeight * uncertainty + noveltyWeight * novelty; //score!!
     
     if(losses) losses[i] = lossval;
     if(slacks) slacks[i] = difficulty;
@@ -1126,17 +1140,17 @@ double get_init_spl_weight(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
 	half = (int) round(sparm->init_valid_fraction*m);
 	double init_spl_weight = (double)m/C/exampleScores[half].val;
 
-  if(sparm->init_valid_fraction_pos) { 
-    totalPos = (int) round(sparm->init_valid_fraction_pos*m/2); //fraction of positive examples
-    numPos = 0;
-    for(i=0;i<m;i++) {
-      if(ex[exampleScores[i].index].y.label == 1) numPos++;
-      if(numPos >= totalPos) { 
-        init_spl_weight = (double)m/C/exampleScores[i].val;
-        break;
-      }
-    }
-  }
+  // if(sparm->init_valid_fraction_pos) { 
+  //   totalPos = (int) round(sparm->init_valid_fraction_pos*m/2); //fraction of positive examples
+  //   numPos = 0;
+  //   for(i=0;i<m;i++) {
+  //     if(ex[exampleScores[i].index].y.label == 1) numPos++;
+  //     if(numPos >= totalPos) { 
+  //       init_spl_weight = (double)m/C/exampleScores[i].val;
+  //       break;
+  //     }
+  //   }
+  // }
 
 	free(exampleScores);
 
@@ -1602,6 +1616,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
 	struct_parm->init_valid_fraction = 0.5;
   struct_parm->uncertainty_weight = 0.0;
   struct_parm->novelty_weight = 0.0;
+  struct_parm->renyi_exponent = -1.0; // see get_example_scores for what this means
   struct_parm->print_extensive = 0;
   struct_parm->reduced_size = 0;
   struct_parm->init_valid_fraction_pos = 0.0;
@@ -1627,10 +1642,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
     case 'r': i++; learn_parm->biased_hyperplane=atol(argv[i]); break; 
     case 's': i++; learn_parm->svm_maxqpsize=atol(argv[i]); break; 
     case 't': i++; kernel_parm->kernel_type=atol(argv[i]); break;
-    case 'u': i++; struct_parm->uncertainty_weight = atof(argv[i]); break;
-    case 'v': i++; struct_parm->novelty_weight = atof(argv[i]); break;
-    case 'x': i++; struct_parm->print_extensive = atoi(argv[i]); break;
-    case 'y': i++; struct_parm->init_valid_fraction_pos = atof(argv[i]); break;
+    case 'x': i++; struct_parm->renyi_exponent=atof(argv[i]); break;
     case 'z': i++; struct_parm->reduced_size = atoi(argv[i]); break;
     case '-': strcpy(struct_parm->custom_argv[struct_parm->custom_argc++],argv[i]);i++; strcpy(struct_parm->custom_argv[struct_parm->custom_argc++],argv[i]);break; 
     default: printf("\nUnrecognized option %s!\n\n",argv[i]);
