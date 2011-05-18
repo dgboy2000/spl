@@ -1048,7 +1048,6 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
     if(uncertaintyWeight || sparm->print_extensive) {
       numPositions = get_num_latent_variable_options_HACK(ex[i].x, ex[i].y, sm, sparm);
 	    hvScores = get_h_probabilities(ex[i].x, ex[i].y, numPositions, ASIGM, sm, sparm);
-
       uncertainty = get_entropy(hvScores, numPositions);
       free(hvScores);
     } else {
@@ -1056,37 +1055,11 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
     }
 
     if(noveltyWeight || sparm->print_extensive) {
-      // novelty = 0.0; //CHANGE THIS WHEN THE NOVELTY CODE IS READY!!!!!
-      // printf ("Slack %d: %f from label %d, position %d, numPositions %d, true label %d,\n", (int)i, difficulty, ybar.label, hbar.position, numPositions, ex[i].y.label);
-      //LABEL y;
-      //LATENT_VAR h;
-      //y.label = -1;
-      //h.position = -1;
-      //int num_features =  sm->sizePsi;
-      // SVECTOR *psi_minus_one = psi (ex[i].x, y, h, sm, sparm);
-      // 
-      // printf ("w \\cdot phi_minus_one: %f\n", dot_product (sm->w, convert_from_svector (psi_minus_one, num_features), num_features));
-      // 
-      // if (ex[i].y.label == 1)
-      //   {
-      //     SVECTOR *psi_star = psi (ex[i].x, ex[i].y, hbar, sm, sparm);
-      //     double max_slack = dot_product (sm->w, vector_diff (convert_from_svector (psi_minus_one, num_features), 
-      //                                                         convert_from_svector (psi_star, num_features),
-      //                                                         num_features),
-      //                                     num_features);
-      //     printf ("Slack from -1 case is %f\n", max_slack + 1);
-      //   }
-      // 
-      // printf ("Features: \n"); print_double_vec (sm->w, sm->sizePsi);
-      // printf ("phi star: \n"); print_double_vec (convert_from_svector (fy, sm->sizePsi), num_features);
-      // printf ("phi hat: \n"); print_double_vec (convert_from_svector (fybar, sm->sizePsi), sm->sizePsi);
-      // printf("*"); fflush(stdout);
       novelty = get_novelty(ex,i,sm,sparm);
-
     } else {
       novelty = 0.0;    
     }
-    //printf("Example %d, difficulty %.4f, uncertainty %.4f, loss %.4f\n",i,difficulty,uncertainty,lossval);
+
 		exampleScores[i].val = (uncertaintyWeight + difficultyWeight)*lossval + difficultyWeight * difficulty + uncertaintyWeight * uncertainty + noveltyWeight * novelty; //score!!
     
     if(losses) losses[i] = lossval;
