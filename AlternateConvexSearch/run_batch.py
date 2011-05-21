@@ -7,6 +7,9 @@ import math
 import os
 import sys
 
+from itertools import izip
+argmax = lambda array: max(izip(array, xrange(len(array))))[1]
+
 print sys.argv
 assert len(sys.argv) == 2, "Correct usage is python run_batch.py [params file]"
 execfile(sys.argv[1])
@@ -97,15 +100,23 @@ def var(a):
 
 # Run the jobs
 stats = {}
+best_seed_stats = {}
+best_stats_list = []
 summary_stats = []
 for alg_name, alg_jobs in jobs.iteritems():
   ALG_ROOT = RUN_ROOT+'/'+alg_name
   stats[alg_name] = {}
+  best_seed_stats[alg_name] = {}
   alg_stats = stats[alg_name]
   
   for prot, prot_jobs in alg_jobs.iteritems():
+    
     prot_stats = {'train' : [], 'test' : []}
+    best_seed_stats[alg_name][prot] = {}
+    
     for fold, fold_jobs in prot_jobs.iteritems():
+      best_seed_stats[alg_name][prot][fold] = {'train' : [], 'test' : []}
+      
       for seed, seed_jobs in fold_jobs.iteritems():
         
         try:
@@ -131,15 +142,27 @@ for alg_name, alg_jobs in jobs.iteritems():
         training_basename = '%s/motif%s_%d_%s' %(ALG_ROOT, prot, fold, seed)
         training_error_file = '%s.error.train' %training_basename
         test_error_file = '%s.error.test' %training_basename
-        prot_stats['train'].append(float(open(training_error_file, 'r').read()))
-        prot_stats['test'].append(float(open(test_error_file, 'r').read()))
+        
+        training_error = float(open(training_error_file, 'r').read())
+        test_error = float(open(test_error_file, 'r').read())
+        
+        prot_stats['train'].append(training_error)
+        prot_stats['test'].append(test_error)
+        best_seed_stats[alg_name][prot][fold]['train'].append(training_error)
+        best_seed_stats[alg_name][prot][fold]['test'].append(test_error)
+        
+      best_seed_ind = argmax(best_seed_stats[alg_name][prot][fold]['train'])
+      best_train = best_seed_stats[alg_name][prot][fold]['train'][best_seed_ind]
+      best_test = best_seed_stats[alg_name][prot][fold]['test'][best_seed_ind]
+      best_stats_list.append("Alg %s protein %s fold %s error: train %f, test %f" %(alg_name, prot, fold, best_train, best_test))
         
     summary_stats.append("Stats for protein %s:" %prot)
     summary_stats.append("Training: n %d, mean %f, stdev %f" %(len(prot_stats['train']), mean(prot_stats['train']), math.sqrt(var(prot_stats['train']))))
     summary_stats.append("Test: n %d, mean %f, stdev %f" %(len(prot_stats['test']), mean(prot_stats['test']), math.sqrt(var(prot_stats['test']))))
     alg_stats[prot] = prot_stats
 
-print "\n".join(summary_stats)
+# print "\n".join(summary_stats)
+print "\n".join(best_stats_list)
 stats_filename = RUN_ROOT+'/STATS'
 STATS_FILE = open(stats_filename, 'w')
 STATS_FILE.write("\n".join(summary_stats))
