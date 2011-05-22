@@ -103,6 +103,7 @@ def var(a):
 stats = {}
 best_seed_stats = {}
 best_stats_list = []
+avg_prot_list = []
 summary_stats = []
 for alg_name, alg_jobs in jobs.iteritems():
   ALG_ROOT = RUN_ROOT+'/'+alg_name
@@ -157,13 +158,21 @@ for alg_name, alg_jobs in jobs.iteritems():
       best_test = best_seed_stats[alg_name][prot][fold]['test'][best_seed_ind]
       best_stats_list.append("Alg %s protein %s fold %s error: train %f, test %f" %(alg_name, prot, fold, best_train, best_test))
         
+      best_seed_stats[alg_name][prot][fold]['train'] = best_train
+      best_seed_stats[alg_name][prot][fold]['test'] = best_test
+        
+    mean_train = mean([best_seed_stats[alg_name][prot][fold]['train'] for fold in best_seed_stats[alg_name][prot]])
+    mean_test = mean([best_seed_stats[alg_name][prot][fold]['test'] for fold in best_seed_stats[alg_name][prot]])
+    avg_prot_list.append("Alg %s protein %s mean error: train %f, test %f" %(alg_name, prot, mean_train, mean_test))
+        
     summary_stats.append("Stats for protein %s:" %prot)
     summary_stats.append("Training: n %d, mean %f, stdev %f" %(len(prot_stats['train']), mean(prot_stats['train']), math.sqrt(var(prot_stats['train']))))
     summary_stats.append("Test: n %d, mean %f, stdev %f" %(len(prot_stats['test']), mean(prot_stats['test']), math.sqrt(var(prot_stats['test']))))
     alg_stats[prot] = prot_stats
 
 # print "\n".join(summary_stats)
-print "\n".join(best_stats_list)
+# print "\n".join(best_stats_list)
+print "\n".join(avg_prot_list)
 stats_filename = RUN_ROOT+'/STATS'
 STATS_FILE = open(stats_filename, 'w')
 STATS_FILE.write("\n".join(summary_stats))
