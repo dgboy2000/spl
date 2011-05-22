@@ -171,7 +171,7 @@ for alg_name, alg_jobs in jobs.iteritems():
     alg_stats[prot] = prot_stats
 
 # print "\n".join(summary_stats)
-# print "\n".join(best_stats_list)
+print "\n".join(best_stats_list)
 print "\n".join(avg_prot_list)
 stats_filename = RUN_ROOT+'/STATS'
 STATS_FILE = open(stats_filename, 'w')
