@@ -9,6 +9,7 @@ import sys
 
 from itertools import izip
 argmax = lambda array: max(izip(array, xrange(len(array))))[1]
+argmin = lambda array: min(izip(array, xrange(len(array))))[1]
 
 print sys.argv
 assert len(sys.argv) == 2, "Correct usage is python run_batch.py [params file]"
@@ -151,7 +152,7 @@ for alg_name, alg_jobs in jobs.iteritems():
         best_seed_stats[alg_name][prot][fold]['train'].append(training_error)
         best_seed_stats[alg_name][prot][fold]['test'].append(test_error)
         
-      best_seed_ind = argmax(best_seed_stats[alg_name][prot][fold]['train'])
+      best_seed_ind = argmin(best_seed_stats[alg_name][prot][fold]['train'])
       best_train = best_seed_stats[alg_name][prot][fold]['train'][best_seed_ind]
       best_test = best_seed_stats[alg_name][prot][fold]['test'][best_seed_ind]
       best_stats_list.append("Alg %s protein %s fold %s error: train %f, test %f" %(alg_name, prot, fold, best_train, best_test))
