@@ -95,5 +95,6 @@ typedef struct struct_learn_parm {
 	int rng_seed;
 	int size_hog;
 	int n_classes;
+  int margin_type;
 } STRUCT_LEARN_PARM;
 
