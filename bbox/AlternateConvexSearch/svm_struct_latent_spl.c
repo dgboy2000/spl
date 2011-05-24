@@ -618,8 +618,116 @@ int check_acs_convergence(int *prev_valid_examples, int *valid_examples, long m)
 	return converged;
 }
 
-int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPLE *ex, 
-													STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight) {
+// Get the weight of a generalized probability distribution (weight <= 1)
+double
+get_weight (double *probs, int numEntries)
+{
+  int k;
+  double weight;
+
+  weight = 0.0;
+  for (k=0; k<numEntries; ++k)
+    weight += probs[k];
+
+  return weight;
+}
+
+double get_renyi_entropy (double *probs, double alpha, int numEntries) {
+  int k;
+  double p, entropy;
+
+  if (alpha == 1)
+    {
+      for (k=0; k<numEntries; ++k)
+        {
+          p = probs[k];
+          if (p > 0)
+	    entropy += p * log2 (p);
+        }
+      entropy /= get_weight (probs, numEntries);
+    }
+  else
+    {
+      printf ("WARNING: called get_renyi_entropy for unsupported alpha = %f\n", alpha);
+    }
+  return entropy;
+}
+
+void get_shannon_entropy_diff(int i, sortStruct * exampleScores, EXAMPLE *ex, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+  // calculate the joint probs over yhat, hhat for point i                                                                                    
+  // save correct and incorrectly labeled parts of distribution                                                                               
+  int numLatentOptions = get_num_latent_variable_options(ex[i].x, sm, sparm);
+  int numCorrectPositions = numLatentOptions;
+  int numIncorrectPositions = (sparm->n_classes - 1) * numLatentOptions;
+  double *correct_probs = calloc (numCorrectPositions, sizeof (double));
+  double *incorrect_probs = calloc (numIncorrectPositions, sizeof (double));
+  get_yhat_hhat_probs (ex[i].x, ex[i].y, correct_probs, incorrect_probs,sm, sparm);
+
+  // compute entropy of each half                                                                                                             
+  double correct_entropy = get_renyi_entropy (correct_probs, 1, numCorrectPositions);
+  double incorrect_entropy = get_renyi_entropy (incorrect_probs, 1, numIncorrectPositions);
+
+  exampleScores[i].val = correct_entropy - incorrect_entropy;
+}
+
+void get_renyi_entropy_diff(int i, sortStruct * exampleScores, EXAMPLE *ex, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+  printf("ERROR: Renyi exponent %f not yet implemented\n",sparm->renyi_exponent);
+}
+
+sortStruct *get_example_scores(long m,double C,SVECTOR **fycache,EXAMPLE *ex,STRUCTMODEL *sm,STRUCT_LEARN_PARM *sparm) {
+  long i, j;
+  double difficulty, lossval;
+
+  sortStruct *exampleScores = (sortStruct *) malloc(m*sizeof(sortStruct));
+  LABEL ybar;
+  LATENT_VAR hbar;
+  SVECTOR *f, *fy, *fybar;
+
+  for (i=0;i<m;i++) {
+    find_most_violated_constraint(&(ex[i]), &ybar, &hbar, sm, sparm);
+    fy = copy_svector(fycache[i]);
+    fybar = psi(ex[i].x,ybar,hbar,sm,sparm);
+    exampleScores[i].index = i;
+    lossval = loss(ex[i].y,ybar,hbar,sparm);
+    
+    difficulty = 0.0;
+
+    if (sparm->renyi_exponent == -1.0) {
+      for (f=fy;f;f=f->next) {
+	j = 0;
+	while (1) {
+	  if(!f->words[j].wnum)
+	    break;
+	  difficulty -= sm->w[f->words[j].wnum]*f->words[j].weight;
+	  j++;
+	}
+      }
+      for (f=fybar;f;f=f->next) {
+	j = 0;
+	while (1) {
+	  if(!f->words[j].wnum)
+	    break;
+	  difficulty += sm->w[f->words[j].wnum]*f->words[j].weight;
+	  j++;
+	}
+      }
+      exampleScores[i].val = lossval + difficulty;
+    } else if (sparm->renyi_exponent == 1.0) {
+      get_shannon_entropy_diff(i, exampleScores, ex, sm, sparm);
+    } else if (sparm->renyi_exponent > 1.0) {
+      get_renyi_entropy_diff(i, exampleScores, ex, sm, sparm);
+    } else {
+      printf("ERROR: Renyi exponent %f may cause Singularity...just kidding, it's invalid.\n", sparm->renyi_exponent);
+    }
+    free_svector(fy);
+    free_svector(fybar);
+  }
+
+  qsort(exampleScores,m,sizeof(sortStruct),&compar);
+  return(exampleScores);
+}
+
+int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPLE *ex, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight) {
 
 	long i, j;
 
@@ -630,55 +738,23 @@ int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPL
 		return (m);
 	}
 
-	sortStruct *slack = (sortStruct *) malloc(m*sizeof(sortStruct));
-	LABEL ybar;
-	LATENT_VAR hbar;
-	SVECTOR *f, *fy, *fybar;
-	double lossval;
+	sortStruct *exampleScores = get_example_scores(m, C, fycache, ex, sm, sparm);
+
 	double penalty = 1.0/spl_weight;
 	if(penalty < 0.0)
 		penalty = DBL_MAX;
-
-	for (i=0;i<m;i++) {
-	        find_most_violated_constraint(&(ex[i]), &ybar, &hbar, sm, sparm);
-		fy = copy_svector(fycache[i]);
-		fybar = psi(ex[i].x,ybar,hbar,sm,sparm);
-		slack[i].index = i;
-		slack[i].val = loss(ex[i].y,ybar,hbar,sparm);
-		for (f=fy;f;f=f->next) {
-			j = 0;
-			while (1) {
-				if(!f->words[j].wnum)
-					break;
-				slack[i].val -= sm->w[f->words[j].wnum]*f->words[j].weight;
-				j++;
-			}
-		}
-		for (f=fybar;f;f=f->next) {
-			j = 0;
-			while (1) {
-				if(!f->words[j].wnum)
-					break;
-				slack[i].val += sm->w[f->words[j].wnum]*f->words[j].weight;
-				j++;
-			}
-		}
-		free_svector(fy);
-		free_svector(fybar);
-	}
-	qsort(slack,m,sizeof(sortStruct),&compar);
 
 	int nValid = 0;
 	for (i=0;i<m;i++)
 		valid_examples[i] = 0;
 	for (i=0;i<m;i++) {
-		if(slack[i].val*C/m > penalty)
+		if(exampleScores[i].val*C/m > penalty)
 			break;
-		valid_examples[slack[i].index] = 1;
+		valid_examples[exampleScores[i].index] = 1;
 		nValid++;
 	}
 
-	free(slack);
+	free(exampleScores);
 
 	return nValid;
 }
@@ -1133,6 +1209,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
 	struct_parm->optimizer_type = 1; /* default: cutting plane, change to 1 for stochastic subgradient descent*/
 	struct_parm->init_valid_fraction = 0.5;
 	struct_parm->margin_type = 0;
+	struct_parm->renyi_exponent = -1.0; // see get_example_scores for what this means
 
   struct_parm->custom_argc=0;
 
@@ -1145,6 +1222,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
     case 'd': i++; kernel_parm->poly_degree=atol(argv[i]); break;
     case 'r': i++; learn_parm->biased_hyperplane=atol(argv[i]); break; 
     case 't': i++; kernel_parm->kernel_type=atol(argv[i]); break;
+    case 'x': i++; struct_parm->renyi_exponent=atof(argv[i]); break;
     case 'n': i++; learn_parm->maxiter=atol(argv[i]); break;
     case 'p': i++; learn_parm->remove_inconsistent=atol(argv[i]); break; 
 		case 'k': i++; *init_spl_weight = atof(argv[i]); break;
