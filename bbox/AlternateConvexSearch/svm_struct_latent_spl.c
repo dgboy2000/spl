@@ -658,7 +658,7 @@ double get_renyi_entropy (double *probs, double alpha, int numEntries) {
         sum_alpha += pow(probs[k], alpha);
         sum += probs[k];
       }
-      entropy = (1.0 / (1.0 - alpha)) * (log(sum_alpha) - log(sum)); 
+      entropy = (1.0 / (1.0 - alpha)) * (log2(sum_alpha) - log2(sum)); 
     }
   return entropy;
 }
