@@ -636,6 +636,10 @@ double get_renyi_entropy (double *probs, double alpha, int numEntries) {
   int k;
   double p, entropy;
 
+  if (alpha < 1.0) {
+    printf("WARNING: invalid renyi exponent %f\n", alpha);
+  }
+
   if (alpha == 1)
     {
       for (k=0; k<numEntries; ++k)
@@ -648,12 +652,18 @@ double get_renyi_entropy (double *probs, double alpha, int numEntries) {
     }
   else
     {
-      printf ("WARNING: called get_renyi_entropy for unsupported alpha = %f\n", alpha);
+      double sum_alpha = 0.0;
+      double sum = 0.0;
+      for (k = 0; k < numEntries; ++k) {
+        sum_alpha += pow(probs[k], alpha);
+        sum += probs[k];
+      }
+      entropy = (1.0 / (1.0 - alpha)) * (log(sum_alpha) - log(sum)); 
     }
   return entropy;
 }
 
-void get_shannon_entropy_diff(int i, sortStruct * exampleScores, EXAMPLE *ex, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+void get_renyi_entropy_diff(int i, sortStruct * exampleScores, EXAMPLE *ex, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
   // calculate the joint probs over yhat, hhat for point i                                                                                    
   // save correct and incorrectly labeled parts of distribution                                                                               
   int numLatentOptions = get_num_latent_variable_options(ex[i].x, sm, sparm);
@@ -664,14 +674,10 @@ void get_shannon_entropy_diff(int i, sortStruct * exampleScores, EXAMPLE *ex, ST
   get_yhat_hhat_probs (ex[i].x, ex[i].y, correct_probs, incorrect_probs,sm, sparm);
 
   // compute entropy of each half                                                                                                             
-  double correct_entropy = get_renyi_entropy (correct_probs, 1, numCorrectPositions);
-  double incorrect_entropy = get_renyi_entropy (incorrect_probs, 1, numIncorrectPositions);
+  double correct_entropy = get_renyi_entropy (correct_probs, sparm->renyi_exponent, numCorrectPositions);
+  double incorrect_entropy = get_renyi_entropy (incorrect_probs, sparm->renyi_exponent, numIncorrectPositions);
 
   exampleScores[i].val = correct_entropy - incorrect_entropy;
-}
-
-void get_renyi_entropy_diff(int i, sortStruct * exampleScores, EXAMPLE *ex, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
-  printf("ERROR: Renyi exponent %f not yet implemented\n",sparm->renyi_exponent);
 }
 
 sortStruct *get_example_scores(long m,double C,SVECTOR **fycache,EXAMPLE *ex,STRUCTMODEL *sm,STRUCT_LEARN_PARM *sparm) {
@@ -712,9 +718,7 @@ sortStruct *get_example_scores(long m,double C,SVECTOR **fycache,EXAMPLE *ex,STR
 	}
       }
       exampleScores[i].val = lossval + difficulty;
-    } else if (sparm->renyi_exponent == 1.0) {
-      get_shannon_entropy_diff(i, exampleScores, ex, sm, sparm);
-    } else if (sparm->renyi_exponent > 1.0) {
+    } else if (sparm->renyi_exponent >= 1.0) {
       get_renyi_entropy_diff(i, exampleScores, ex, sm, sparm);
     } else {
       printf("ERROR: Renyi exponent %f may cause Singularity...just kidding, it's invalid.\n", sparm->renyi_exponent);
