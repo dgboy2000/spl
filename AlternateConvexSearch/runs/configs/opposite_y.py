@@ -5,7 +5,7 @@ params = {
     'seeds' : [ '0000', '1000', '2000', '3000' ],
     
     'name' : 'opposite_y',
-    'extension' : '2011-05-17', # Set this to 'datetime' to make a new run or a specific string to continue an old one
+    'extension' : '2011-05-25', # Set this to 'datetime' to make a new run or a specific string to continue an old one
     'description' : """
 This control run covers cccp, slack, uncertainty, and shannon learning algorithms.
         """,
@@ -14,7 +14,7 @@ This control run covers cccp, slack, uncertainty, and shannon learning algorithm
     'param_pairs' : {
         # 'cccp' : ['-c 150 -k 0 -m 1.3 --t 1', ''],
         # 'slack' : ['-c 150 -k 100 -m 1.3 -f 0.55 --t 1', ''],
-        'uncertainty' : ['-c 150 -k 100 -m 1.3 -f 0.55 -x -2.0 --t 1', ''],
+        # 'uncertainty' : ['-c 150 -k 100 -m 1.3 -f 0.55 -x -2.0 --t 1', ''],
         'shannon' : ['-c 150 -k 100 -m 1.3 -f 0.55 -x 1.0 --t 1', '']
     },
     
