@@ -1,4 +1,3 @@
-
 /************************************************************************/
 /*                                                                      */
 /*   svm_struct_latent_api.c                                            */
@@ -22,6 +21,8 @@
 #include "./SFMT-src-1.3.3/SFMT.h"
 
 #define MAX_INPUT_LINE_LENGTH 10000
+
+#define DELTA 1.0
 
 SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm) {
 /*
@@ -108,6 +109,17 @@ SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm) {
   return(sample); 
 }
 
+double compute_w_T_psi(PATTERN *x, int position_x, int position_y, int class, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+     int i;
+     double score = 0.0;
+			 
+     double * hog = x->hog[position_x][position_y];
+     for(i = 0; i < sparm->size_hog; i++) {
+	   score += sm->w[class*sparm->size_hog+i+1]*hog[i];
+     }
+     return score;
+}
+
 void init_struct_model(SAMPLE sample, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, LEARN_PARM *lparm, KERNEL_PARM *kparm) {
 /*
   Initialize parameters in STRUCTMODEL sm. Set the diminension 
@@ -183,20 +195,13 @@ void classify_struct_example(PATTERN x, LABEL *y, LATENT_VAR *h, STRUCTMODEL *sm
 	int cur_class, cur_position_x, cur_position_y;
 	double max_score;
 	double score;
-	double *hog;
 	FILE	*fp;
 
 	max_score = -DBL_MAX;
 	for(cur_position_x = 0; cur_position_x < width; cur_position_x++) {
 		for(cur_position_y = 0; cur_position_y < height; cur_position_y++) {
-
-			hog = x.hog[cur_position_x][cur_position_y];
-
 			for(cur_class = 0; cur_class < sparm->n_classes; cur_class++) {
-				score = 0;
-				for(i = 0; i < sparm->size_hog; i++) {
-					score += sm->w[cur_class*sparm->size_hog+i+1]*hog[i];
-				}
+			        score = compute_w_T_psi(&x, cur_position_x, cur_position_y, cur_class, sm, sparm);
 				if(score > max_score) {
 					max_score = score;
 					y->label = cur_class;
@@ -224,20 +229,13 @@ void find_most_violated_constraint_marginrescaling(PATTERN x, LABEL y, LABEL *yb
 	int height = x.height;
 	int cur_class, cur_position_x, cur_position_y;
 	double max_score,score;
-	double *hog;
 	FILE	*fp;
 
 	max_score = -DBL_MAX;
 	for(cur_position_x = 0; cur_position_x < width; cur_position_x++) {
 		for(cur_position_y = 0; cur_position_y < height; cur_position_y++) {
-
-			hog = x.hog[cur_position_x][cur_position_y];
-
 			for(cur_class = 0; cur_class < sparm->n_classes; cur_class++) {
-				score = 0;
-				for(i = 0; i < sparm->size_hog; i++) {
-					score += sm->w[cur_class*sparm->size_hog+i+1]*hog[i];
-				}
+			        score = compute_w_T_psi(&x, cur_position_x, cur_position_y, cur_class, sm, sparm);
 				if(cur_class != y.label)
 					score += 1;
 				if(score > max_score) {
@@ -253,6 +251,84 @@ void find_most_violated_constraint_marginrescaling(PATTERN x, LABEL y, LABEL *yb
 
 	return;
 
+}
+
+void find_most_violated_constraint_differenty(PATTERN x, LABEL y,LABEL*ybar,LATENT_VAR*hbar,STRUCTMODEL*sm,STRUCT_LEARN_PARM*sparm) {
+  /*                                                                                                                                            
+  Finds the most violated constraint (loss-augmented inference), i.e.,                                                                        
+  computing argmax_{(ybar,hbar)} [<w,psi(x,ybar,hbar)> +
+						   loss(y,ybar,hbar)].                                                                  
+  The output (ybar,hbar) are stored at location pointed by                                                                                    
+  pointers *ybar and *hbar.                                                                                                                   
+  */
+
+  int i;
+  int width = x.width;
+  int height = x.height;
+  int cur_class, cur_position_x, cur_position_y;
+  double max_score,score;
+  FILE    *fp;
+
+  max_score = -DBL_MAX;
+  for(cur_position_x = 0; cur_position_x < width; cur_position_x++) {
+    for(cur_position_y = 0; cur_position_y < height; cur_position_y++) {
+	for(cur_class = 0; cur_class < sparm->n_classes; cur_class++) {
+	  if (cur_class != y.label) {
+	    score = compute_w_T_psi(&x, cur_position_x, cur_position_y, cur_class, sm, sparm);
+	    score += 1;
+	    if(score > max_score) {
+	      max_score = score;
+	      ybar->label = cur_class;
+	      hbar->position_x = cur_position_x;
+	      hbar->position_y = cur_position_y;
+	    }
+	  }
+	}
+    }
+  }
+  return;
+}
+
+void get_yhat_hhat_probs (PATTERN x, LABEL y, double *correct_probs, double *incorrect_probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+  int i_correct = 0;
+  int i_incorrect = 0;
+  int cur_position_x;
+  int cur_position_y;
+  int cur_class;
+  double sum = 0.0;
+  int width = x.width;
+  int height = x.height;
+
+  for (cur_position_x = 0; cur_position_x < width; cur_position_x++) {
+    for (cur_position_y = 0; cur_position_y < height; cur_position_y++) {
+      for (cur_class = 0; cur_class < sparm->n_classes; cur_class++) {
+	if (cur_class == y.label) {
+	  correct_probs[i_correct] = exp(compute_w_T_psi(&x, cur_position_x, cur_position_y, cur_class, sm, sparm));
+	  sum += correct_probs[i_correct];
+	  i_correct++;
+	} else {
+	  incorrect_probs[i_incorrect] = exp(DELTA + compute_w_T_psi(&x, cur_position_x, cur_position_y, cur_class, sm, sparm));
+	  sum += incorrect_probs[i_incorrect];
+	  i_incorrect++;
+	}
+      }
+    }
+  }
+      int n_correct = i_correct;
+      int n_incorrect = i_incorrect;
+      int i;
+      for (i = 0; i < n_correct; i++) {
+	correct_probs[i] /= sum;
+      }
+
+      for (i = 0; i < n_incorrect; i++) {
+	incorrect_probs[i] /= sum;
+      }
+}
+
+
+int get_num_latent_variable_options(PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+  return x.width * x.height;
 }
 
 LATENT_VAR infer_latent_variables(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
@@ -274,13 +350,7 @@ LATENT_VAR infer_latent_variables(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LE
 	max_score = -DBL_MAX;
 	for(cur_position_x = 0; cur_position_x < width; cur_position_x++) {
 		for(cur_position_y = 0; cur_position_y < height; cur_position_y++) {
-
-			hog = x.hog[cur_position_x][cur_position_y];
-
-			score = 0;
-			for(i = 0; i < sparm->size_hog; i++) {
-				score += sm->w[y.label*sparm->size_hog+i+1]*hog[i];
-			}
+		        score = compute_w_T_psi(&x, cur_position_x, cur_position_y, y.label, sm, sparm);
 			if(score > max_score) {
 				max_score = score;
 				h.position_x = cur_position_x;
@@ -432,6 +502,7 @@ void parse_struct_parameters(STRUCT_LEARN_PARM *sparm) {
       case 's': i++; sparm->rng_seed = atoi(sparm->custom_argv[i]); break;
       case 'h': i++; sparm->size_hog = atoi(sparm->custom_argv[i]); break;
       case 'n': i++; sparm->n_classes = atoi(sparm->custom_argv[i]); break;
+      case 't': i++; sparm->margin_type = atoi(sparm->custom_argv[i]); break;
       default: printf("\nUnrecognized option %s!\n\n", sparm->custom_argv[i]); exit(0);
     }
   }
