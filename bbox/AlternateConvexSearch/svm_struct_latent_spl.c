@@ -634,19 +634,20 @@ get_weight (double *probs, int numEntries)
 
 double get_renyi_entropy (double *probs, double alpha, int numEntries) {
   int k;
-  double p, entropy;
+  double p;
+  double entropy = 0.0;
 
-  if (alpha < 1.0) {
+  if (alpha <= 0.0) {
     printf("WARNING: invalid renyi exponent %f\n", alpha);
   }
 
-  if (alpha == 1)
+  if (alpha == 1.0)
     {
       for (k=0; k<numEntries; ++k)
         {
           p = probs[k];
           if (p > 0)
-	    entropy += p * log2 (p);
+	    entropy -= p * log2 (p); //minus rather than plus because log2(p) is negative
         }
       entropy /= get_weight (probs, numEntries);
     }
@@ -718,7 +719,7 @@ sortStruct *get_example_scores(long m,double C,SVECTOR **fycache,EXAMPLE *ex,STR
 	}
       }
       exampleScores[i].val = lossval + difficulty;
-    } else if (sparm->renyi_exponent >= 1.0) {
+    } else if (sparm->renyi_exponent > 0.0) {
       get_renyi_entropy_diff(i, exampleScores, ex, sm, sparm);
     } else {
       printf("ERROR: Renyi exponent %f may cause Singularity...just kidding, it's invalid.\n", sparm->renyi_exponent);
