@@ -859,11 +859,12 @@ get_renyi_entropy (double *probs, double alpha, int numEntries)
   
   if (alpha == 1)
     {
+      entropy = 0.0;
       for (k=0; k<numEntries; ++k)
         {          
           p = probs[k];
           if (p > 0)
-    	      entropy += p * log2 (p);
+    	      entropy -= p * log2 (p);
         }
       entropy /= get_weight (probs, numEntries);
     }
