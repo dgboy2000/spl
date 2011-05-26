@@ -26,6 +26,7 @@
 #include "svm_struct_latent_api.h"
 #include "./svm_light/svm_learn.h"
 
+#define EXPECTED_UNIFORMITY 0.9
 
 #define ALPHA_THRESHOLD 1E-14
 #define IDLE_ITER 20
@@ -653,13 +654,27 @@ double get_renyi_entropy (double *probs, double alpha, int numEntries) {
     }
   else
     {
-      double sum_alpha = 0.0;
-      double sum = 0.0;
+      long double sum_alpha = 0.0;
+      long double sum = 0.0;
+      long double renyi_shift = alpha * log(EXPECTED_UNIFORMITY * numEntries);
+      //double avg_log_prob = 0.0;
+      //double numerator = 0.0;
+      //for (k = 0; k < numEntries; ++k) {
+      //	if (probs[k] > 1e-10) {
+      //	  avg_log_prob += log(probs[k]);
+      //	}
+      //}
+      //avg_log_prob *= alpha / (1.0 * numEntries);
       for (k = 0; k < numEntries; ++k) {
-        sum_alpha += pow(probs[k], alpha);
-        sum += probs[k];
+	if (probs[k] > 0.0) {
+	  sum_alpha += exp(alpha * log(probs[k]) + renyi_shift);
+	  sum += probs[k];
+	}
       }
-      entropy = (1.0 / (1.0 - alpha)) * (log2(sum_alpha) - log2(sum)); 
+      //printf("sum_alpha = %f\n", sum_alpha);
+      //printf("sum = %f\n", sum);
+      entropy = (1.0 / (1.0 - alpha)) * (log2(sum_alpha) - renyi_shift / log(2.0) - log2(sum)); 
+      //printf("entropy = %f\n", entropy); 
     }
   return entropy;
 }
@@ -679,6 +694,7 @@ void get_renyi_entropy_diff(int i, sortStruct * exampleScores, EXAMPLE *ex, STRU
   double incorrect_entropy = get_renyi_entropy (incorrect_probs, sparm->renyi_exponent, numIncorrectPositions);
 
   exampleScores[i].val = correct_entropy - incorrect_entropy;
+  //printf("renyi entropy diff = %f\n", exampleScores[i].val);
 }
 
 sortStruct *get_example_scores(long m,double C,SVECTOR **fycache,EXAMPLE *ex,STRUCTMODEL *sm,STRUCT_LEARN_PARM *sparm) {
@@ -733,7 +749,7 @@ sortStruct *get_example_scores(long m,double C,SVECTOR **fycache,EXAMPLE *ex,STR
 }
 
 int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPLE *ex, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight) {
-
+  printf("1.0 / spl_weight = %f\n", 1.0 / spl_weight);
 	long i, j;
 
 	/* if self-paced learning weight is non-positive, all examples are valid */
