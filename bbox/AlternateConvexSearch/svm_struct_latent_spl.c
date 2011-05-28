@@ -94,6 +94,14 @@ double* add_list_nn(SVECTOR *a, long totwords)
     return(sum);
 }
 
+double array_max (double *array, int numElts)
+{
+  double max = array[0];
+  int i;
+  for (i=1; i<numElts; ++i)
+    max = MAX(array[i], max);
+  return max;
+}
 
 void find_most_violated_constraint(EXAMPLE *ex, LABEL *ybar, LATENT_VAR *hbar, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
   switch (sparm->margin_type) {
@@ -637,6 +645,7 @@ double get_renyi_entropy (double *probs, double alpha, int numEntries) {
   int k;
   double p;
   double entropy = 0.0;
+  //printf("uninitialized entropy = %f\n", entropy);
 
   if (alpha <= 0.0) {
     printf("WARNING: invalid renyi exponent %f\n", alpha);
@@ -654,6 +663,21 @@ double get_renyi_entropy (double *probs, double alpha, int numEntries) {
     }
   else
     {
+      double pMax, sum, term1, term2, term3;
+     
+      pMax = array_max (probs, numEntries);
+     
+      sum = 0.0;
+      for (k=0; k<numEntries; ++k)
+	sum += pow ((probs[k] / pMax), alpha);
+       
+      term1 = alpha * log2 (pMax);      
+      term2 = log2 (sum);
+      term3 = log2 (get_weight (probs, numEntries));
+     
+      entropy = (term1 + term2 - term3) / (1 - alpha);
+
+      /*
       long double sum_alpha = 0.0;
       long double sum = 0.0;
       long double renyi_shift = alpha * log(EXPECTED_UNIFORMITY * numEntries);
@@ -675,6 +699,7 @@ double get_renyi_entropy (double *probs, double alpha, int numEntries) {
       //printf("sum = %f\n", sum);
       entropy = (1.0 / (1.0 - alpha)) * (log2(sum_alpha) - renyi_shift / log(2.0) - log2(sum)); 
       //printf("entropy = %f\n", entropy); 
+      */
     }
   return entropy;
 }
@@ -694,6 +719,8 @@ void get_renyi_entropy_diff(int i, sortStruct * exampleScores, EXAMPLE *ex, STRU
   double incorrect_entropy = get_renyi_entropy (incorrect_probs, sparm->renyi_exponent, numIncorrectPositions);
 
   exampleScores[i].val = correct_entropy - incorrect_entropy;
+  free(correct_probs);
+  free(incorrect_probs);
   //printf("renyi entropy diff = %f\n", exampleScores[i].val);
 }
 
