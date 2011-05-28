@@ -868,6 +868,22 @@ get_renyi_entropy (double *probs, double alpha, int numEntries)
         }
       entropy /= get_weight (probs, numEntries);
     }
+  else if (alpha > 1)
+    {
+      double pMax, sum, term1, term2, term3;
+      
+      pMax = array_max (probs, numEntries);
+      
+      sum = 0.0;
+      for (k=0; k<numEntries; ++k)
+        sum += pow ((probs[k] / pMax), alpha);
+        
+      term1 = alpha * log2 (pMax);      
+      term2 = log2 (sum);
+      term3 = log2 (get_weight (probs, numEntries));
+      
+      entropy = (term1 + term2 - term3) / (1 - alpha);
+    }
   else
     {
       printf ("WARNING: called get_renyi_entropy for unsupported alpha = %f\n", alpha);
@@ -1038,7 +1054,7 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
     		
     		exampleScores[i].val = lossval + difficulty;
 		  }
-		else if (sparm->renyi_exponent == 1.0)
+		else if (sparm->renyi_exponent >= 1.0)
       {
         // calculate the joint probs over yhat, hhat for point i
         // save correct and incorrectly labeled parts of distribution
@@ -1048,8 +1064,8 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
         get_yhat_hhat_probs (ex[i].x, ex[i].y, correct_probs, incorrect_probs, sm, sparm);
 
         // compute entropy of each half
-        double correct_entropy = get_renyi_entropy (correct_probs, 1, numPositions);
-        double incorrect_entropy = get_renyi_entropy (incorrect_probs, 1, numPositions);
+        double correct_entropy = get_renyi_entropy (correct_probs, sparm->renyi_exponent, numPositions);
+        double incorrect_entropy = get_renyi_entropy (incorrect_probs, sparm->renyi_exponent, numPositions);
         
         free (correct_probs);
         free (incorrect_probs);
