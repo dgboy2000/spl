@@ -18,7 +18,7 @@ This control run covers cccp, slack, uncertainty, and shannon learning algorithm
         # 'shannon' : ['-c 150 -k 100 -m 1.3 -f 0.55 -x 1.0 --t 1', '']
         'alpha2' : ['-c 150 -k 100 -m 1.3 -f 0.55 -x 2.0 --t 1', ''],
         'alpha100' : ['-c 150 -k 100 -m 1.3 -f 0.55 -x 100.0 --t 1', ''],
-        'alpha10000' : ['-c 150 -k 100 -m 1.3 -f 0.55 -x 10000.0 --t 1', ''],
+        'alpha10000' : ['-c 150 -k 100 -m 1.3 -f 0.55 -x 10000.0 --t 1', '']
     },
     
     'raise_errors' : True
