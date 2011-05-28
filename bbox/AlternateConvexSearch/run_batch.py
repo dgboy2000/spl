@@ -68,8 +68,8 @@ for alg_name,param_pair in params['param_pairs'].iteritems():
       training_params, inference_params = param_pair
       training_params = training_params + ' --s '+seed
       
-      training_data = '%s/train_%d.data' %(DATA_ROOT, fold)
-      test_data = '%s/test_%d.data' %(DATA_ROOT, fold)        
+      training_data = '%s/train_%d.txt' %(DATA_ROOT, fold)
+      test_data = '%s/test_%d.txt' %(DATA_ROOT, fold)        
       
       training_basename = '%s/bbox_%d_%s' %(ALG_ROOT, fold, seed)
       training_model = '%s.model' %training_basename
