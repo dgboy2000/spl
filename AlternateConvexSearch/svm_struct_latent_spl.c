@@ -1005,7 +1005,7 @@ SVECTOR * get_expected_psih(PATTERN x, LABEL y, int numPositions, double Asigm, 
 
 sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex, 
 													STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, 
-                          double *losses, double *slacks, double *entropies, double *novelties) {
+                          double *losses, double *slacks, double *entropies, double *novelties, double *difficulties) {
 	long i, j;
   int numPositions;
 	double difficulty, lossval, uncertainty, novelty, *hvScores, scoreSum;
@@ -1100,6 +1100,7 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
     if(slacks) slacks[i] = difficulty;
     if(entropies) entropies[i] = uncertainty;
     if(novelties) novelties[i] = novelty; 
+    if(difficulties) difficulties[i] = exampleScores[i].val; 
 
 		free_svector(fy);
 		free_svector(fybar);
@@ -1123,7 +1124,7 @@ int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPL
 		return (m);
 	}
 
-	sortStruct *exampleScores = get_example_scores(m, C, fycache, ex, sm, sparm, losses, slacks, entropies, novelties);
+	sortStruct *exampleScores = get_example_scores(m, C, fycache, ex, sm, sparm, losses, slacks, entropies, novelties, difficulties);
 
   double penalty = 1.0/spl_weight;
 	if(penalty < 0.0)
@@ -1149,7 +1150,7 @@ int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPL
 double get_init_spl_weight(long m, double C, SVECTOR **fycache, EXAMPLE *ex, 
 													 STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
 
-	sortStruct *exampleScores = get_example_scores(m, C, fycache, ex, sm, sparm, NULL, NULL, NULL, NULL);
+	sortStruct *exampleScores = get_example_scores(m, C, fycache, ex, sm, sparm, NULL, NULL, NULL, NULL, NULL);
   printf("\n");  
 
   long i;
