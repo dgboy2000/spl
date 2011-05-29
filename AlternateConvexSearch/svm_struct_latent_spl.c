@@ -24,6 +24,7 @@
 #include <time.h>
 #include <math.h>
 #include "debug.h"
+#include "svm_struct_latent_utils.h"
 #include "svm_struct_latent_api.h"
 #include "./svm_light/svm_learn.h"
 #include "./svm_light/svm_common.h"
@@ -45,7 +46,6 @@
 #define DEBUG_LEVEL 0
 
 #define ASIGM -1.5
-#define LOG2_E 0.69314718055994529
 
 //#define SECOND_PROP 0.05
 //#define DELAY 3
@@ -63,11 +63,6 @@ int resize_cleanup(int size_active, int **ptr_idle, double **ptr_alpha, double *
 void approximate_to_psd(double **G, int size_active, double eps);
 
 void Jacobi_Cyclic_Method(double eigenvalues[], double *eigenvectors, double *A, int n);
-
-double log2 (double x)
-{
-  return log (x) / LOG2_E;
-}
 
 int compare_dbl (const void * a, const void * b)
 {
@@ -117,13 +112,6 @@ double sprod_nn(double *a, double *b, long n) {
   return(ans);
 }
 
-void add_vector_nn(double *w, double *dense_x, long n, double factor) {
-  long i;
-  for (i=1;i<n+1;i++) {
-    w[i]+=factor*dense_x[i];
-  }
-}
-
 // log_svector (file *, "fycache for asdf: ", asdf);
 void log_fycache (FILE *f, SVECTOR **fycache, int m, int iter)
 {
@@ -138,27 +126,6 @@ void log_fycache (FILE *f, SVECTOR **fycache, int m, int iter)
         fprintf (f, " %d:%f", w[j].wnum, w[j].weight);
       fprintf (f, "\n");
     }
-}
-
-double* add_list_nn(SVECTOR *a, long totwords) 
-     /* computes the linear combination of the SVECTOR list weighted
-	by the factor of each SVECTOR. assumes that the number of
-	features is small compared to the number of elements in the
-	list */
-{
-    SVECTOR *f;
-    long i;
-    double *sum;
-
-    sum=create_nvector(totwords);
-
-    for(i=0;i<=totwords;i++) 
-      sum[i]=0;
-
-    for(f=a;f;f=f->next)  
-      add_vector_ns(sum,f,f->factor);
-
-    return(sum);
 }
 
 
@@ -327,6 +294,81 @@ SVECTOR* find_cutting_plane(EXAMPLE *ex, SVECTOR **fycache, double *margin, long
 
   return(fvec); 
 }
+
+
+
+
+
+
+SVECTOR* find_shannon_cutting_plane(EXAMPLE *ex, double ***probs, double *margin, long m, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm,
+                                   int *valid_examples) {
+  long i, j, k, l;
+  double valid_count;
+  double *new_constraint;
+  double **correct_expectation_psi, **incorrect_expectation_psi;
+
+  SVECTOR *fvec;
+  WORD *words;  
+
+  valid_count = 0.0;
+  for (i=0;i<m;i++) {
+    if (valid_examples[i]) {
+      valid_count += 1.0;
+    }
+  }
+
+  /* find cutting plane */
+  *margin = 0.0;
+  new_constraint = (double *)calloc(sm->sizePsi, sizeof(double));
+  for (i=0;i<m;i++) {
+    if (!valid_examples[i]) {
+      continue;
+    }
+    
+    get_expectation_psi (&ex[i].x, &ex[i].y, correct_expectation_psi, incorrect_expectation_psi, probs[i], sm, sparm);
+    add_vector_nn (new_constraint, *correct_expectation_psi, sm->sizePsi);
+    sub_vector_nn (new_constraint, *incorrect_expectation_psi, sm->sizePsi);
+    free (*correct_expectation_psi);
+    free (*incorrect_expectation_psi);
+   
+    *margin += get_expectation_loss (&ex[i].y, probs[i], sm, sparm);
+  }
+  
+  // The cutting plane is a constraint averaged over all examples; divide by num examples
+  mult_vector_n (new_constraint, sm->sizePsi, 1/valid_count);
+  *margin /= valid_count;
+
+  l=0;
+  for (i=1;i<sm->sizePsi+1;i++) {
+    if (fabs(new_constraint[i])>1E-10) l++; // non-zero
+  }
+  words = (WORD*)my_malloc(sizeof(WORD)*(l+1)); 
+  assert(words!=NULL);
+  k=0;
+  for (i=1;i<sm->sizePsi+1;i++) {
+    if (fabs(new_constraint[i])>1E-10) {
+      words[k].wnum = i;
+      words[k].weight = new_constraint[i]; 
+      k++;
+    }
+  }
+  words[k].wnum = 0;
+  words[k].weight = 0.0;
+  fvec = create_svector(words,"",1);
+
+  free(words);
+  free(new_constraint);
+
+  return(fvec);
+}
+
+
+
+
+
+
+
+
 
 /* project weights to ball of radius 1/sqrt{lambda} */
 void project_weights(double *w, int sizePsi, double lambda)
@@ -837,20 +879,6 @@ double get_entropy(double *distrib, int numEntries) {
 	return(entropy);
 }
 
-// Get the weight of a generalized probability distribution (weight <= 1)
-double
-get_weight (double *probs, int numEntries)
-{
-  int k;
-  double weight;
-  
-  weight = 0.0;
-  for (k=0; k<numEntries; ++k)
-    weight += probs[k];
-
-	return weight;
-}
-
 double
 get_renyi_entropy (double *probs, double alpha, int numEntries)
 {
@@ -1061,7 +1089,7 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
         numPositions = get_num_latent_variable_options(ex[i].x, sm, sparm);
         double *correct_probs = calloc (numPositions, sizeof (double));
         double *incorrect_probs = calloc (numPositions, sizeof (double));
-        get_yhat_hhat_probs (ex[i].x, ex[i].y, correct_probs, incorrect_probs, sm, sparm);
+        get_yhat_hhat_probs_old (ex[i].x, ex[i].y, correct_probs, incorrect_probs, sm, sparm);
 
         // compute entropy of each half
         double correct_entropy = get_renyi_entropy (correct_probs, sparm->renyi_exponent, numPositions);
@@ -1313,7 +1341,7 @@ double compute_current_loss(SAMPLE val, STRUCTMODEL *sm, STRUCT_LEARN_PARM *spar
 int main(int argc, char* argv[]) {
   double *w; /* weight vector */
   int outer_iter;
-  long m, i;
+  long m, i, j;
   double C, epsilon;
   LEARN_PARM learn_parm;
   KERNEL_PARM kernel_parm;
@@ -1337,6 +1365,8 @@ int main(int argc, char* argv[]) {
 	SAMPLE val;
   STRUCT_LEARN_PARM sparm;
   STRUCTMODEL sm;
+  
+  double ***probscache; // [example ind][label ind][hidden var ind]
   
   double decrement;
   double primal_obj, last_primal_obj;
@@ -1409,14 +1439,17 @@ int main(int argc, char* argv[]) {
 
   // FILE *ffycache = fopen(fycachefile,"w");
 
-  /* prepare feature vector cache for correct labels with imputed latent variables */
+  /* prepare feature vector cache and probabilities for correct labels with imputed latent variables */
   fycache = (SVECTOR**)malloc(m*sizeof(SVECTOR*));
+  probscache = init_y_h_probs (&sample, &sm, &sparm);
   for (i=0;i<m;i++) {
   	fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
   	diff = add_list_ss(fy);
   	free_svector(fy);
   	fy = diff;
   	fycache[i] = fy;
+  	
+    get_y_h_probs (&ex[i].x, &ex[i].y, probscache[i], &sm, &sparm);
   }
   // log_fycache (ffycache, fycache, m, -3);
 
@@ -1444,6 +1477,7 @@ int main(int argc, char* argv[]) {
         free_svector(fy);
         fy = diff;
         fycache[i] = fy;
+        get_y_h_probs (&ex[i].x, &ex[i].y, probscache[i], &sm, &sparm);
     	}
       // log_fycache (ffycache, fycache, m, initIter-2);
 		}
@@ -1544,7 +1578,7 @@ int main(int argc, char* argv[]) {
 			latent_update++;
 		}
   
-    /* re-compute feature vector cache */
+    /* re-compute feature vector and probabilities cache */
     for (i=0;i<m;i++) {
       free_svector(fycache[i]);
       fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
@@ -1552,6 +1586,7 @@ int main(int argc, char* argv[]) {
       free_svector(fy);
       fy = diff;
       fycache[i] = fy;
+      get_y_h_probs (&ex[i].x, &ex[i].y, probscache[i], &sm, &sparm);
     }
     // log_fycache (ffycache, fycache, m, outer_iter);
 		sprintf(itermodelfile,"%s.%04d",modelfile,outer_iter);

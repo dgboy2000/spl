@@ -31,14 +31,23 @@ double loss(LABEL y, LABEL ybar, LATENT_VAR hbar, STRUCT_LEARN_PARM *sparm);
 void write_struct_model(char *file, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
 STRUCTMODEL read_struct_model(char *file, STRUCT_LEARN_PARM *sparm);
 void get_latent_variable_scores(PATTERN x, LABEL y, double *scores, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
+
 int get_num_latent_variable_options_HACK(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
 int get_num_latent_variable_options(PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
-void get_yhat_hhat_probs (PATTERN x, LABEL y, double *correct_probs, double *incorrect_probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
+
+double ***init_y_h_probs (SAMPLE *s, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
+void get_y_h_probs (PATTERN *x, LABEL *y, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
+void get_yhat_hhat_probs_old (PATTERN x, LABEL y, double *correct_probs, double *incorrect_probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
+
+void get_expectation_psi (PATTERN *x, LABEL *y, double **correct_expectation_psi, double **incorrect_expectation_psi, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
+double get_expectation_loss (LABEL *y, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
+
 void free_struct_model(STRUCTMODEL sm, STRUCT_LEARN_PARM *sparm);
 void free_pattern(PATTERN x);
 void free_label(LABEL y);
 void free_latent_var(LATENT_VAR h);
 void free_struct_sample(SAMPLE s);
+
 void parse_struct_parameters(STRUCT_LEARN_PARM *sparm);
 int compute_hamming_distance(PATTERN x1, int h1Pos, PATTERN x2, int h2Pos, STRUCT_LEARN_PARM *sparm);
 

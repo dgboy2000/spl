@@ -19,6 +19,7 @@
 #include <string.h>
 #include <math.h>
 #include "svm_struct_latent_api_types.h"
+#include "svm_struct_latent_utils.h"
 #include "./SFMT-src-1.3.3/SFMT.h"
 
 #define MAX_INPUT_LINE_LENGTH 10000
@@ -437,7 +438,7 @@ void get_latent_variable_scores(PATTERN x, LABEL y, double *scores, STRUCTMODEL 
 
 // Compute the joint probability distribution of yhat and hhat values for the specified example
 void
-get_yhat_hhat_probs (PATTERN x, LABEL y, double *correct_probs, double *incorrect_probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
+get_yhat_hhat_probs_old (PATTERN x, LABEL y, double *correct_probs, double *incorrect_probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
 {
   double *positive_probs, *negative_probs, lossval, sum;
   int h, numPositions;
@@ -479,6 +480,122 @@ get_yhat_hhat_probs (PATTERN x, LABEL y, double *correct_probs, double *incorrec
       negative_probs[h] /= sum;
     }
 }
+
+
+// Compute the joint probability distribution of y and h values for the specified example
+void
+get_y_h_probs (PATTERN *x, LABEL *y, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
+{
+  double lossval, sum;
+  int i, h, numPositions, numLabels;
+    
+  sum = 0.0;
+  numPositions = get_num_latent_variable_options (*x, sm, sparm);
+
+  // compute positive scores
+  lossval = (y->label == 1) ? 0 : DELTA;
+  for (h=0; h < numPositions; h++)
+    {
+      probs[1][h] = exp (lossval + compute_psi_diff_score(*x, sm, sparm, h));
+      sum += probs[1][h];
+    }
+
+  // compute negative scores
+  lossval = (y->label == -1) ? 0 : DELTA;
+  for (h=0; h < numPositions; h++)
+    {
+      probs[0][h] = exp (lossval);
+      sum += probs[0][h];
+    }
+
+  // normalize the probabilities
+  for (h=0; h < numPositions; ++h)
+    {
+      probs[0][h] /= sum;
+      probs[1][h] /= sum;
+    }
+}
+
+double ***
+init_y_h_probs (SAMPLE *sample, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
+{
+  int i, j, numExamples;
+  double ***probs;
+  
+  numExamples = sample->n;
+  probs = (double ***)malloc(numExamples*sizeof(double **));
+  
+  for (i=0; i<numExamples; ++i)
+    {
+      probs[i] = (double **)malloc(2*sizeof(double *));
+      for (j=0; j<2; ++j)
+        {
+          probs[i][j] = (double *)calloc(get_num_latent_variable_options(sample->examples[i].x, sm, sparm), sizeof(double));
+        }
+    }
+    
+  return probs;
+}
+
+void
+get_expectation_psi (PATTERN *x, LABEL *y, double **correct_expectation_psi, double **incorrect_expectation_psi, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
+{
+  int numPositions;
+  double *correct_probs, *incorrect_probs, probs_weight;
+  LABEL yhat;
+  LATENT_VAR h;
+  SVECTOR *cur_psi, *lhs, *f;
+  
+  numPositions = get_num_latent_variable_options (*x, sm, sparm);
+  
+  if (y->label == 1)
+    {
+      correct_probs = probs[1];
+      incorrect_probs = probs[0];
+    }
+  else
+    {
+      correct_probs = probs[0];
+      incorrect_probs = probs[1];
+    }
+  
+  lhs = NULL;
+  probs_weight = get_weight (correct_probs, numPositions);
+  for (h.position=0; h.position<numPositions; ++h.position)
+    {
+      cur_psi = psi(*x, *y, h, sm, sparm);
+      for (f=cur_psi;f;f=f->next) {
+        f->factor *= correct_probs[h.position] / probs_weight;
+      }
+      append_svector_list (cur_psi, lhs);
+      lhs = cur_psi;
+    }
+    
+  *correct_expectation_psi = add_list_nn(lhs, sm->sizePsi);
+  free_svector(lhs);
+  
+  lhs = NULL;
+  yhat.label = -1 * y->label;
+  probs_weight = get_weight (incorrect_probs, numPositions);
+  for (h.position=0; h.position<numPositions; ++h.position)
+    {
+      cur_psi = psi(*x, yhat, h, sm, sparm);
+      for (f=cur_psi;f;f=f->next) {
+        f->factor *= incorrect_probs[h.position] / probs_weight;
+      }
+      append_svector_list (cur_psi, lhs);
+      lhs = cur_psi;
+    }
+    
+  *incorrect_expectation_psi = add_list_nn(lhs, sm->sizePsi);
+  free_svector(lhs);
+}
+
+double get_expectation_loss (LABEL *y, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
+{
+  return DELTA;
+}
+
 
 
 LATENT_VAR infer_latent_variables(PATTERN x, LABEL y, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
