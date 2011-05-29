@@ -504,7 +504,7 @@ double stochastic_subgradient_descent(double *w, long m, int MAX_ITER, double C,
 
 }
 
-double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double epsilon, SVECTOR **fycache, EXAMPLE *ex, 
+double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double C_shannon, double epsilon, SVECTOR **fycache, EXAMPLE *ex, 
 															STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples) {
   long i,j;
   double *alpha;
@@ -1206,7 +1206,7 @@ double get_init_spl_weight(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
 	return(init_spl_weight);
 }
 
-double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double epsilon, SVECTOR **fycache, EXAMPLE *ex, 
+double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double C_shannon, double epsilon, SVECTOR **fycache, EXAMPLE *ex, 
                                STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight, 
                                double *losses, double *slacks, double *entropies, double *novelties, double *difficulties) {
 
@@ -1238,7 +1238,7 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
 		for (i=0;i<sm->sizePsi+1;i++)
 			w[i] = 0.0;
 		if(!sparm->optimizer_type)
-			relaxed_primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, epsilon, fycache, ex, sm, sparm, valid_examples);
+			relaxed_primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, C_shannon, epsilon, fycache, ex, sm, sparm, valid_examples);
 		else
 			relaxed_primal_obj = stochastic_subgradient_descent(w, m, MAX_ITER, C, epsilon, fycache, ex, sm, sparm, valid_examples);
 		if(nValid < m)
@@ -1342,7 +1342,7 @@ int main(int argc, char* argv[]) {
   double *w; /* weight vector */
   int outer_iter;
   long m, i, j;
-  double C, epsilon;
+  double C, C_shannon, epsilon;
   LEARN_PARM learn_parm;
   KERNEL_PARM kernel_parm;
   char trainfile[1024];
@@ -1386,6 +1386,7 @@ int main(int argc, char* argv[]) {
 
   epsilon = learn_parm.eps;
   C = learn_parm.svm_c;
+  C_shannon = sparm.svm_c_shannon;
   MAX_ITER = learn_parm.maxiter;
 
   /* read in examples */
@@ -1463,7 +1464,7 @@ int main(int argc, char* argv[]) {
 		int initIter;
 		for (initIter=0;initIter<2;initIter++) {
 			if(!sparm.optimizer_type)
-				primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples);
+				primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, C_shannon, epsilon, fycache, ex, &sm, &sparm, valid_examples);
 			else
 				primal_obj = stochastic_subgradient_descent(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples);
   		for (i=0;i<m;i++) {
@@ -1525,7 +1526,7 @@ int main(int argc, char* argv[]) {
     /* cutting plane algorithm */
     //primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples);
 		/* solve biconvex self-paced learning problem */
-		primal_obj = alternate_convex_search(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples, spl_weight, losses, slacks, entropies, novelties, difficulties);
+		primal_obj = alternate_convex_search(w, m, MAX_ITER, C, C_shannon, epsilon, fycache, ex, &sm, &sparm, valid_examples, spl_weight, losses, slacks, entropies, novelties, difficulties);
 		int nValid = 0;
 		for (i=0;i<m;i++) {
 			fprintf(fexamples,"%d ",valid_examples[i]);
@@ -1647,7 +1648,8 @@ int main(int argc, char* argv[]) {
 
 
 
-void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* modelfile, char *examplesfile, char *timefile, char *latentfile,char *slackfile, char *uncertaintyfile, char *noveltyfile, char *lossfile, char *fycachefile, char *difficultyfile, LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm,double *init_spl_weight, double *spl_factor) {
+void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* modelfile, char *examplesfile, char *timefile, char *latentfile,char *slackfile, char *uncertaintyfile, char *noveltyfile, char *lossfile, char *fycachefile, char *difficultyfile,
+                              LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm,double *init_spl_weight, double *spl_factor) {
   
   long i;
 	char filestub[1024];
@@ -1668,6 +1670,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
 	*init_spl_weight = 0.0;
 	*spl_factor = 1.3;
 	struct_parm->optimizer_type = 0; /* default: cutting plane, change to 1 for stochastic subgradient descent*/
+  struct_parm->svm_c_shannon = 0.0; /* Constant for the shannon slack in the objective */
 	struct_parm->init_valid_fraction = 0.5;
   struct_parm->uncertainty_weight = 0.0;
   struct_parm->novelty_weight = 0.0;
