@@ -6,29 +6,29 @@
 
 void add_mult_vector_nn (double *a, double *b, long n, double factor)
 {
-       long i;
-       for (i = 0; i < n; ++i)
-       {
-               a[i] += factor * b[i];
-       }
+  long i;
+  for (i = 0; i <= n; ++i)
+  {
+    a[i] += factor * b[i];
+  }
 }
 void add_vector_nn (double *a, double *b, long n)
 {
-       add_mult_vector_nn (a, b, n, 1.0);
+  add_mult_vector_nn (a, b, n, 1.0);
 }
 
 void mult_vector_n (double *a, long n, double factor)
 {
-       long i;
-       for (i = 0; i < n; ++i)
-       {
-               a[i] *= factor;
-       }
+  long i;
+  for (i = 0; i <= n; ++i)
+  {
+    a[i] *= factor;
+  }
 }
 
 void sub_vector_nn (double *a, double *b, long n)
 {
-       add_mult_vector_nn (a, b, n, -1.0);
+  add_mult_vector_nn (a, b, n, -1.0);
 }
 
 

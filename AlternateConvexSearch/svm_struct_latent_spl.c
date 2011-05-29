@@ -139,20 +139,21 @@ void find_most_violated_constraint(EXAMPLE *ex, LABEL *ybar, LATENT_VAR *hbar, S
   }
 }
 
-
-double current_obj_val(EXAMPLE *ex, SVECTOR **fycache, long m, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, double C, int *valid_examples) {
+double current_obj_val(EXAMPLE *ex, double ***probscache, SVECTOR **fycache, long m, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, double C, double C_shannon, int *valid_examples) {
 
   long i, j;
   SVECTOR *f, *fy, *fybar, *lhs;
   LABEL       ybar;
   LATENT_VAR hbar;
-  double lossval, margin;
-  double *new_constraint;
+  double lossval, margin, margin_shannon;
+  double *new_constraint, *new_constraint_shannon, *correct_expectation_psi, *incorrect_expectation_psi;
 	double obj = 0.0;
 
   /* find cutting plane */
   lhs = NULL;
   margin = 0;
+  margin_shannon = 0.0;
+  new_constraint_shannon = (double *)calloc(sm->sizePsi+1, sizeof(double));
   for (i=0;i<m;i++) {
 		if(!valid_examples[i])
 			continue;
@@ -177,6 +178,17 @@ double current_obj_val(EXAMPLE *ex, SVECTOR **fycache, long m, STRUCTMODEL *sm, 
     lhs = fybar;
     //margin+=lossval/m;
 		margin += lossval*ex[i].x.example_cost/m;
+		
+		if (C_shannon > 0.0)
+		  {
+		    get_expectation_psi (&ex[i].x, &ex[i].y, &correct_expectation_psi, &incorrect_expectation_psi, probscache[i], sm, sparm);
+        add_vector_nn (new_constraint_shannon, correct_expectation_psi, sm->sizePsi);
+        sub_vector_nn (new_constraint_shannon, incorrect_expectation_psi, sm->sizePsi);
+        free (correct_expectation_psi);
+        free (incorrect_expectation_psi);
+
+        margin_shannon += get_expectation_loss (&ex[i].y, probscache[i], sm, sparm);
+		  }
   }
 
   /* compact the linear representation */
@@ -192,6 +204,28 @@ double current_obj_val(EXAMPLE *ex, SVECTOR **fycache, long m, STRUCTMODEL *sm, 
 	for(i = 1; i < sm->sizePsi+1; i++)
 		obj += 0.5*sm->w[i]*sm->w[i];
   free(new_constraint);
+  
+  if (C_shannon > 0.0)
+    {
+      // The cutting plane is a constraint averaged over all examples; divide by num examples
+      mult_vector_n (new_constraint_shannon, sm->sizePsi, 1/m);
+      margin_shannon /= m;
+      
+      double obj_shannon;
+      
+      obj_shannon = margin_shannon;
+    	for(i = 1; i < sm->sizePsi+1; i++)
+    		obj_shannon -= new_constraint_shannon[i]*sm->w[i];
+    	if(obj_shannon < 0.0)
+    	  {
+          printf ("WARNING: shannon objective part < 0! (we don't think this should happen)\n");
+      		obj_shannon = 0.0;
+    	  }
+    	obj_shannon *= C_shannon;
+      obj += obj_shannon;
+      
+      free (new_constraint_shannon);
+    }
 
 	return obj;
 }
@@ -320,7 +354,7 @@ SVECTOR* find_shannon_cutting_plane(EXAMPLE *ex, double ***probs, double *margin
 
   /* find cutting plane */  
   *margin = 0.0;
-  new_constraint = (double *)calloc(sm->sizePsi, sizeof(double));
+  new_constraint = (double *)calloc(sm->sizePsi+1, sizeof(double));
   for (i=0;i<m;i++) {
     if (!valid_examples[i]) {
       continue;
@@ -346,7 +380,7 @@ SVECTOR* find_shannon_cutting_plane(EXAMPLE *ex, double ***probs, double *margin
   words = (WORD*)my_malloc(sizeof(WORD)*(l+1)); 
   assert(words!=NULL);
   k=0;
-  for (i=1;i<sm->sizePsi+1;i++) {
+  for (i=1; i < sm->sizePsi+1;i++) {
     if (fabs(new_constraint[i])>1E-10) {
       words[k].wnum = i;
       words[k].weight = new_constraint[i]; 
@@ -416,7 +450,7 @@ long *randperm(long m, long n)
 }
 
 /* stochastic subgradient descent for solving the convex structural SVM problem */
-double stochastic_subgradient_descent(double *w, long m, int MAX_ITER, double C, double epsilon, SVECTOR **fycache, EXAMPLE *ex, 
+double stochastic_subgradient_descent(double *w, long m, int MAX_ITER, double C, double C_shannon, double epsilon, double ***probscache, SVECTOR **fycache, EXAMPLE *ex, 
 															STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples) {
 
 	/* constants */
@@ -500,7 +534,7 @@ double stochastic_subgradient_descent(double *w, long m, int MAX_ITER, double C,
   printf(" Inner loop optimization finished.\n"); fflush(stdout); 
 
 	/* return primal objective value */
-	primal_obj = current_obj_val(ex, fycache, m, sm, sparm, C, valid_examples);
+	primal_obj = current_obj_val(ex, probscache, fycache, m, sm, sparm, C, C_shannon, valid_examples);
 	return(primal_obj);
 
 }
@@ -758,7 +792,7 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
 
  	} // end cutting plane while loop 
 
-	primal_obj = current_obj_val(ex, fycache, m, sm, sparm, C, valid_examples);
+	primal_obj = current_obj_val(ex, probscache, fycache, m, sm, sparm, C, C_shannon, valid_examples);
 
   printf(" Inner loop optimization finished.\n"); fflush(stdout); 
       
@@ -1279,7 +1313,7 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
 	for (i=0;i<sm->sizePsi+1;i++)
 		best_w[i] = w[i];
 	nValid = update_valid_examples(w, m, C, fycache, ex, sm, sparm, valid_examples, spl_weight, losses, slacks, entropies, novelties, difficulties);
-	last_relaxed_primal_obj = current_obj_val(ex, fycache, m, sm, sparm, C, valid_examples);
+	last_relaxed_primal_obj = current_obj_val(ex, probscache, fycache, m, sm, sparm, C, C_shannon, valid_examples);
 	if(nValid < m)
 		last_relaxed_primal_obj += (double)(m-nValid)/((double)spl_weight);
 
@@ -1299,7 +1333,7 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
 		if(!sparm->optimizer_type)
 			relaxed_primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, C_shannon, epsilon, probscache, fycache, ex, sm, sparm, valid_examples);
 		else
-			relaxed_primal_obj = stochastic_subgradient_descent(w, m, MAX_ITER, C, epsilon, fycache, ex, sm, sparm, valid_examples);
+			relaxed_primal_obj = stochastic_subgradient_descent(w, m, MAX_ITER, C, C_shannon, epsilon, probscache, fycache, ex, sm, sparm, valid_examples);
 		if(nValid < m)
 			relaxed_primal_obj += (double)(m-nValid)/((double)spl_weight);
 		decrement = last_relaxed_primal_obj-relaxed_primal_obj;
@@ -1338,7 +1372,7 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
 	}
 
 	double primal_obj;
-	primal_obj = current_obj_val(ex, fycache, m, sm, sparm, C, prev_valid_examples);
+	primal_obj = current_obj_val(ex, probscache, fycache, m, sm, sparm, C, C_shannon, prev_valid_examples);
 	
 	free(prev_valid_examples);
 	free(best_w);
@@ -1525,7 +1559,7 @@ int main(int argc, char* argv[]) {
 			if(!sparm.optimizer_type)
 				primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, C_shannon, epsilon, probscache, fycache, ex, &sm, &sparm, valid_examples);
 			else
-				primal_obj = stochastic_subgradient_descent(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples);
+				primal_obj = stochastic_subgradient_descent(w, m, MAX_ITER, C, C_shannon, epsilon, probscache, fycache, ex, &sm, &sparm, valid_examples);
   		for (i=0;i<m;i++) {
    	 		free_latent_var(ex[i].h);
    	 		ex[i].h = infer_latent_variables(ex[i].x, ex[i].y, &sm, &sparm);
