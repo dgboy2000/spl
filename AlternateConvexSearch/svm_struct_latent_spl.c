@@ -51,13 +51,14 @@
 //#define DELAY 3
 
 
-int mosek_qp_optimize(double**, double*, double*, long, double, double*);
+int mosek_qp_optimize(double**, double*, double*, long, double, double, int *, double*);
+int mosek_qp_optimize_old(double**, double*, double*, long, double, double*);
 
 void my_read_input_parameters(int argc, char* argv[], char *trainfile,char *modelfile, char *examplesfile, char *timefile, char *latentfile,char *slackfile, char *uncertaintyfile, char *noveltyfile, char*lossfile, char*fycachefile, char *difficultyfile, LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm,STRUCT_LEARN_PARM *struct_parm, double *init_spl_weight, double*spl_factor);
 
 void my_wait_any_key();
 
-int resize_cleanup(int size_active, int **ptr_idle, double **ptr_alpha, double **ptr_delta, DOC ***ptr_dXc,
+int resize_cleanup(int size_active, int **ptr_idle, int **ptr_slack_or_shannon, double **ptr_alpha, double **ptr_delta, DOC ***ptr_dXc,
 		double ***ptr_G, int *mv_iter);
 
 void approximate_to_psd(double **G, int size_active, double eps);
@@ -305,7 +306,7 @@ SVECTOR* find_shannon_cutting_plane(EXAMPLE *ex, double ***probs, double *margin
   long i, j, k, l;
   double valid_count;
   double *new_constraint;
-  double **correct_expectation_psi, **incorrect_expectation_psi;
+  double *correct_expectation_psi, *incorrect_expectation_psi;
 
   SVECTOR *fvec;
   WORD *words;  
@@ -317,7 +318,7 @@ SVECTOR* find_shannon_cutting_plane(EXAMPLE *ex, double ***probs, double *margin
     }
   }
 
-  /* find cutting plane */
+  /* find cutting plane */  
   *margin = 0.0;
   new_constraint = (double *)calloc(sm->sizePsi, sizeof(double));
   for (i=0;i<m;i++) {
@@ -325,11 +326,11 @@ SVECTOR* find_shannon_cutting_plane(EXAMPLE *ex, double ***probs, double *margin
       continue;
     }
     
-    get_expectation_psi (&ex[i].x, &ex[i].y, correct_expectation_psi, incorrect_expectation_psi, probs[i], sm, sparm);
-    add_vector_nn (new_constraint, *correct_expectation_psi, sm->sizePsi);
-    sub_vector_nn (new_constraint, *incorrect_expectation_psi, sm->sizePsi);
-    free (*correct_expectation_psi);
-    free (*incorrect_expectation_psi);
+    get_expectation_psi (&ex[i].x, &ex[i].y, &correct_expectation_psi, &incorrect_expectation_psi, probs[i], sm, sparm);
+    add_vector_nn (new_constraint, correct_expectation_psi, sm->sizePsi);
+    sub_vector_nn (new_constraint, incorrect_expectation_psi, sm->sizePsi);
+    free (correct_expectation_psi);
+    free (incorrect_expectation_psi);
    
     *margin += get_expectation_loss (&ex[i].y, probs[i], sm, sparm);
   }
@@ -504,21 +505,22 @@ double stochastic_subgradient_descent(double *w, long m, int MAX_ITER, double C,
 
 }
 
-double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double C_shannon, double epsilon, SVECTOR **fycache, EXAMPLE *ex, 
+double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double C_shannon, double epsilon, double ***probscache, SVECTOR **fycache, EXAMPLE *ex, 
 															STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples) {
   long i,j;
   double *alpha;
   DOC **dXc; /* constraint matrix */
   double *delta; /* rhs of constraints */
-  SVECTOR *new_constraint;
+  SVECTOR *new_constraint, *new_constraint_shannon;
   int iter, size_active; 
-  double value;
+  double value, value_shannon;
 	double threshold = 0.0;
-  double margin;
+  double margin, margin_shannon;
   double primal_obj, cur_obj;
 	double *cur_slack = NULL;
 	int mv_iter;
 	int *idle = NULL;
+  int *slack_or_shannon = NULL; /* slack_or_shannon[i] = 0 if slack, 1 if shannon */
 	double **G = NULL;
 	SVECTOR *f;
 	int r;
@@ -565,11 +567,13 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
   printf("Running structural SVM solver: "); fflush(stdout); 
 
 	new_constraint = find_cutting_plane(ex, fycache, &margin, m, sm, sparm, valid_examples);
+  new_constraint_shannon = find_shannon_cutting_plane(ex, probscache, &margin_shannon, m, sm, sparm, valid_examples);
   
   // printf ("Found the following first constraint:\n");
   // print_svec (new_constraint);
   
  	value = margin - sprod_ns(w, new_constraint);
+ 	value_shannon = margin_shannon - sprod_ns(w, new_constraint_shannon);
 	while((value>threshold+epsilon)&&(iter<MAX_ITER)) {
 		iter+=1;
 		size_active+=1;
@@ -599,8 +603,10 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
 
 		/* update Gram matrix */
 		G = (double **) realloc(G, sizeof(double *)*size_active);
-		assert(G!=NULL);
+		slack_or_shannon = (int *) realloc(slack_or_shannon, sizeof(int)*size_active);
+		assert(G!=NULL && slack_or_shannon!=NULL);
 		G[size_active-1] = NULL;
+		slack_or_shannon[size_active-1] = 0;
 		for(j = 0; j < size_active; j++) {
 			G[j] = (double *) realloc(G[j], sizeof(double)*size_active);
 			assert(G[j]!=NULL);
@@ -614,8 +620,57 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
 		/* hack: add a constant to the diagonal to make sure G is PSD */
 		G[size_active-1][size_active-1] += 1e-6;
 
+
+
+   	/* add second constraint (shannon) */
+   	if (C_shannon > 0.0)
+   	  {
+        size_active += 1;
+        
+      	dXc = (DOC**)realloc(dXc, sizeof(DOC*)*size_active);
+       	assert(dXc!=NULL);
+       	dXc[size_active-1] = (DOC*)malloc(sizeof(DOC));
+       	dXc[size_active-1]->fvec = new_constraint_shannon; 
+       	dXc[size_active-1]->slackid = 2; // only one common slackid (one-slack)
+       	dXc[size_active-1]->costfactor = 1.0;
+       	
+       	delta = (double*)realloc(delta, sizeof(double)*size_active);
+       	assert(delta!=NULL);
+       	delta[size_active-1] = margin_shannon;
+
+       	alpha = (double*)realloc(alpha, sizeof(double)*size_active);
+       	assert(alpha!=NULL);
+       	alpha[size_active-1] = 0.0;
+
+    		idle = (int *) realloc(idle, sizeof(int)*size_active);
+    		assert(idle!=NULL);
+    		idle[size_active-1] = 0;
+
+    		/* update Gram matrix */
+    		G = (double **) realloc(G, sizeof(double *)*size_active);
+    		slack_or_shannon = (int *) realloc(slack_or_shannon, sizeof(int)*size_active);
+    		assert(G!=NULL && slack_or_shannon!=NULL);
+    		G[size_active-1] = NULL;
+    		slack_or_shannon[size_active-1] = 1;
+    		for(j = 0; j < size_active; j++) {
+    			G[j] = (double *) realloc(G[j], sizeof(double)*size_active);
+    			assert(G[j]!=NULL);
+    		}
+    		for(j = 0; j < size_active-1; j++) {
+    			G[size_active-1][j] = sprod_ss(dXc[size_active-1]->fvec, dXc[j]->fvec);
+    			G[j][size_active-1]  = G[size_active-1][j];
+    		}
+    		G[size_active-1][size_active-1] = sprod_ss(dXc[size_active-1]->fvec,dXc[size_active-1]->fvec);
+
+    		/* hack: add a constant to the diagonal to make sure G is PSD */
+    		G[size_active-1][size_active-1] += 1e-6;
+   	  }
+
+
    	/* solve QP to update alpha */
-		r = mosek_qp_optimize(G, delta, alpha, (long) size_active, C, &cur_obj);
+		r = mosek_qp_optimize(G, delta, alpha, (long) size_active, C, C_shannon, slack_or_shannon, &cur_obj);
+    // r = mosek_qp_optimize_old(G, delta, alpha, (long) size_active, C, &cur_obj);
+
     /*
     double eps = 1e-12;
     while(r >= 1293 && r <= 1296 && eps<100)
@@ -687,15 +742,18 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
 			threshold = 0.0;
 
  		new_constraint = find_cutting_plane(ex, fycache, &margin, m, sm, sparm, valid_examples);
+    new_constraint_shannon = find_shannon_cutting_plane(ex, probscache, &margin_shannon, m, sm, sparm, valid_examples);
     // printf ("Found the following constraint %d:\n", iter);
     //     print_svec (new_constraint);
+    
  		
    	value = margin - sprod_ns(w, new_constraint);
+   	value_shannon = margin_shannon - sprod_ns(w, new_constraint_shannon);
 
 		if((iter % CLEANUP_CHECK) == 0)
 		{
 			printf("+"); fflush(stdout);
-			size_active = resize_cleanup(size_active, &idle, &alpha, &delta, &dXc, &G, &mv_iter);
+			size_active = resize_cleanup(size_active, &idle, &slack_or_shannon, &alpha, &delta, &dXc, &G, &mv_iter);
 		}
 
  	} // end cutting plane while loop 
@@ -714,6 +772,7 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
   free(alpha);
   free(delta);
   free_svector(new_constraint);
+  // free_svector(new_constraint_shannon);
 	free(cur_slack);
 	free(idle);
   if (svm_model!=NULL) free_model(svm_model,0);
@@ -1206,7 +1265,7 @@ double get_init_spl_weight(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
 	return(init_spl_weight);
 }
 
-double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double C_shannon, double epsilon, SVECTOR **fycache, EXAMPLE *ex, 
+double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double C_shannon, double epsilon, double ***probscache, SVECTOR **fycache, EXAMPLE *ex, 
                                STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight, 
                                double *losses, double *slacks, double *entropies, double *novelties, double *difficulties) {
 
@@ -1238,7 +1297,7 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
 		for (i=0;i<sm->sizePsi+1;i++)
 			w[i] = 0.0;
 		if(!sparm->optimizer_type)
-			relaxed_primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, C_shannon, epsilon, fycache, ex, sm, sparm, valid_examples);
+			relaxed_primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, C_shannon, epsilon, probscache, fycache, ex, sm, sparm, valid_examples);
 		else
 			relaxed_primal_obj = stochastic_subgradient_descent(w, m, MAX_ITER, C, epsilon, fycache, ex, sm, sparm, valid_examples);
 		if(nValid < m)
@@ -1464,7 +1523,7 @@ int main(int argc, char* argv[]) {
 		int initIter;
 		for (initIter=0;initIter<2;initIter++) {
 			if(!sparm.optimizer_type)
-				primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, C_shannon, epsilon, fycache, ex, &sm, &sparm, valid_examples);
+				primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, C_shannon, epsilon, probscache, fycache, ex, &sm, &sparm, valid_examples);
 			else
 				primal_obj = stochastic_subgradient_descent(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples);
   		for (i=0;i<m;i++) {
@@ -1526,7 +1585,7 @@ int main(int argc, char* argv[]) {
     /* cutting plane algorithm */
     //primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples);
 		/* solve biconvex self-paced learning problem */
-		primal_obj = alternate_convex_search(w, m, MAX_ITER, C, C_shannon, epsilon, fycache, ex, &sm, &sparm, valid_examples, spl_weight, losses, slacks, entropies, novelties, difficulties);
+		primal_obj = alternate_convex_search(w, m, MAX_ITER, C, C_shannon, epsilon, probscache, fycache, ex, &sm, &sparm, valid_examples, spl_weight, losses, slacks, entropies, novelties, difficulties);
 		int nValid = 0;
 		for (i=0;i<m;i++) {
 			fprintf(fexamples,"%d ",valid_examples[i]);
@@ -1670,7 +1729,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
 	*init_spl_weight = 0.0;
 	*spl_factor = 1.3;
 	struct_parm->optimizer_type = 0; /* default: cutting plane, change to 1 for stochastic subgradient descent*/
-  struct_parm->svm_c_shannon = 0.0; /* Constant for the shannon slack in the objective */
+  struct_parm->svm_c_shannon = 1.0; /* Constant for the shannon slack in the objective */
 	struct_parm->init_valid_fraction = 0.5;
   struct_parm->uncertainty_weight = 0.0;
   struct_parm->novelty_weight = 0.0;
@@ -1756,12 +1815,14 @@ void my_wait_any_key()
   (void)getc(stdin);
 }
 
-int resize_cleanup(int size_active, int **ptr_idle, double **ptr_alpha, double **ptr_delta, DOC ***ptr_dXc, 
-		double ***ptr_G, int *mv_iter) {
+int resize_cleanup(int size_active, int **ptr_idle, int **ptr_slack_or_shannon, double **ptr_alpha, double **ptr_delta, DOC ***ptr_dXc, 
+		double ***ptr_G, int *mv_iter)
+{
   int i,j, new_size_active;
   long k;
 
   int *idle=*ptr_idle;
+  int *slack_or_shannon=*ptr_slack_or_shannon;
   double *alpha=*ptr_alpha;
   double *delta=*ptr_delta;
 	DOC	**dXc = *ptr_dXc;
@@ -1777,6 +1838,7 @@ int resize_cleanup(int size_active, int **ptr_idle, double **ptr_alpha, double *
     /* copying */
     alpha[i] = alpha[j];
     delta[i] = delta[j];
+    slack_or_shannon[i] = slack_or_shannon[j];
 		free(G[i]);
 		G[i] = G[j];
 		G[j] = NULL;
@@ -1798,6 +1860,7 @@ int resize_cleanup(int size_active, int **ptr_idle, double **ptr_alpha, double *
   new_size_active = i;
   alpha = (double*)realloc(alpha, sizeof(double)*new_size_active);
   delta = (double*)realloc(delta, sizeof(double)*new_size_active);
+	slack_or_shannon = (int *) realloc(slack_or_shannon, sizeof(int)*new_size_active);
 	G = (double **) realloc(G, sizeof(double *)*new_size_active);
   dXc = (DOC**)realloc(dXc, sizeof(DOC*)*new_size_active);
   assert(dXc!=NULL);
@@ -1823,6 +1886,7 @@ int resize_cleanup(int size_active, int **ptr_idle, double **ptr_alpha, double *
 	}
 
   *ptr_idle = idle;
+  *ptr_slack_or_shannon = slack_or_shannon;
   *ptr_alpha = alpha;
   *ptr_delta = delta;
 	*ptr_G = G;
