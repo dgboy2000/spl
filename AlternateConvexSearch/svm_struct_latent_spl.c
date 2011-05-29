@@ -1439,15 +1439,11 @@ int main(int argc, char* argv[]) {
    		}
 	    for (i=0;i<m;i++) {
   	    free_svector(fycache[i]);
-        // if (sparm.using_argmax) {
-    	    fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
-     	    diff = add_list_ss(fy);
-          free_svector(fy);
-          fy = diff;
-          fycache[i] = fy;
-        // } else {
-        //   fycache[i] = get_expected_psih(ex[i].x, ex[i].y, get_num_latent_variable_options_HACK(ex[i].x, ex[i].y, &sm, &sparm), ASIGM, &sm, &sparm);
-        // }
+  	    fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
+   	    diff = add_list_ss(fy);
+        free_svector(fy);
+        fy = diff;
+        fycache[i] = fy;
     	}
       // log_fycache (ffycache, fycache, m, initIter-2);
 		}
@@ -1551,15 +1547,11 @@ int main(int argc, char* argv[]) {
     /* re-compute feature vector cache */
     for (i=0;i<m;i++) {
       free_svector(fycache[i]);
-      if (sparm.using_argmax || outer_iter) {
-        fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
-        diff = add_list_ss(fy);
-        free_svector(fy);
-        fy = diff;
-        fycache[i] = fy;
-      } else {
-        fycache[i] = get_expected_psih(ex[i].x, ex[i].y, get_num_latent_variable_options_HACK(ex[i].x, ex[i].y, &sm, &sparm), ASIGM, &sm, &sparm);
-      }
+      fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
+      diff = add_list_ss(fy);
+      free_svector(fy);
+      fy = diff;
+      fycache[i] = fy;
     }
     // log_fycache (ffycache, fycache, m, outer_iter);
 		sprintf(itermodelfile,"%s.%04d",modelfile,outer_iter);
@@ -1649,14 +1641,12 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
   struct_parm->reduced_size = 0;
   struct_parm->init_valid_fraction_pos = 0.0;
   struct_parm->margin_type = 0; // 0 means margin rescaling, 1 means opposite y
-	struct_parm->using_argmax = 1; // 0 means use expectation, 1 means argmax
 
   struct_parm->custom_argc=0;
 	/*-------------------------------------------------------------------------------*/
 
   for(i=1;(i<argc) && ((argv[i])[0] == '-');i++) {
     switch ((argv[i])[1]) {
-    case 'a': i++; struct_parm->using_argmax=atoi(argv[i]); break;
     case 'c': i++; learn_parm->svm_c=atof(argv[i]); break;
     case 'd': i++; kernel_parm->poly_degree=atol(argv[i]); break;
     case 'e': i++; learn_parm->eps=atof(argv[i]); break;
