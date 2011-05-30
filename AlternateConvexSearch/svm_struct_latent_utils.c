@@ -31,6 +31,15 @@ void sub_vector_nn (double *a, double *b, long n)
   add_mult_vector_nn (a, b, n, -1.0);
 }
 
+double sprod_nn(double *a, double *b, long n) {
+  double ans=0.0;
+  long i;
+  for (i=1;i<n+1;i++) {
+    ans+=a[i]*b[i];
+  }
+  return(ans);
+}
+
 
 
 double* add_list_nn(SVECTOR *a, long totwords) 

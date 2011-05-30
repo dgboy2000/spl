@@ -104,15 +104,6 @@ double array_median (double *array, int numElts)
   return array[(numElts-1) / 2];
 }
 
-double sprod_nn(double *a, double *b, long n) {
-  double ans=0.0;
-  long i;
-  for (i=1;i<n+1;i++) {
-    ans+=a[i]*b[i];
-  }
-  return(ans);
-}
-
 // log_svector (file *, "fycache for asdf: ", asdf);
 void log_fycache (FILE *f, SVECTOR **fycache, int m, int iter)
 {
@@ -338,7 +329,7 @@ SVECTOR* find_cutting_plane(EXAMPLE *ex, SVECTOR **fycache, double *margin, long
 SVECTOR* find_shannon_cutting_plane(EXAMPLE *ex, double ***probs, double *margin, long m, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm,
                                    int *valid_examples) {
   long i, j, k, l;
-  double valid_count;
+  double valid_count, loss;
   double *new_constraint;
   double *correct_expectation_psi, *incorrect_expectation_psi;
 
@@ -361,12 +352,16 @@ SVECTOR* find_shannon_cutting_plane(EXAMPLE *ex, double ***probs, double *margin
     }
     
     get_expectation_psi (&ex[i].x, &ex[i].y, &correct_expectation_psi, &incorrect_expectation_psi, probs[i], sm, sparm);
-    add_vector_nn (new_constraint, correct_expectation_psi, sm->sizePsi);
-    sub_vector_nn (new_constraint, incorrect_expectation_psi, sm->sizePsi);
+    loss = get_expectation_loss (&ex[i].y, probs[i], sm, sparm);
+    
+    if (loss - (sprod_nn(sm->w, correct_expectation_psi, sm->sizePsi) - sprod_nn(sm->w, incorrect_expectation_psi, sm->sizePsi)) > 0) {
+      add_vector_nn (new_constraint, correct_expectation_psi, sm->sizePsi);
+      sub_vector_nn (new_constraint, incorrect_expectation_psi, sm->sizePsi);
+      *margin += loss;
+    }    
+    
     free (correct_expectation_psi);
     free (incorrect_expectation_psi);
-   
-    *margin += get_expectation_loss (&ex[i].y, probs[i], sm, sparm);
   }
   
   // The cutting plane is a constraint averaged over all examples; divide by num examples
@@ -548,11 +543,11 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
   SVECTOR *new_constraint, *new_constraint_shannon;
   int iter, size_active; 
   double value, value_shannon;
-	double threshold = 0.0;
+	double threshold = 0.0, threshold_shannon = 0.0;
   double margin, margin_shannon;
   double primal_obj, cur_obj;
 	double *cur_slack = NULL;
-	int mv_iter;
+	int mv_iter, mv_iter_shannon;
 	int *idle = NULL;
   int *slack_or_shannon = NULL; /* slack_or_shannon[i] = 0 if slack, 1 if shannon */
 	double **G = NULL;
@@ -608,7 +603,13 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
   
  	value = margin - sprod_ns(w, new_constraint);
  	value_shannon = margin_shannon - sprod_ns(w, new_constraint_shannon);
-	while((value>threshold+epsilon)&&(iter<MAX_ITER)) {
+ 	
+ 	// FIXME threshold_shannon
+ 	// FIXME: shannon_cutting_plane: on an example-by-example basis, return a null constraint if the sample's constraint it satisfied.
+ 	// Sanity checks: make sure objective for dual problem is increasing as we add more constraints
+
+ 	
+	while((value > threshold+epsilon || (C_shannon > 0.0 && value_shannon > threshold_shannon+epsilon)) && (iter<MAX_ITER)) {
 		iter+=1;
 		size_active+=1;
 
@@ -657,7 +658,7 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
 
 
    	/* add second constraint (shannon) */
-   	if (C_shannon > 0.0)
+    if (C_shannon > 0.0)
    	  {
         size_active += 1;
         
@@ -756,24 +757,26 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
 					j++;
 				}
 			}
-			if(cur_slack[i] >= delta[i])
-				cur_slack[i] = 0.0;
-			else
-				cur_slack[i] = delta[i]-cur_slack[i];
+      cur_slack[i] = MAX(0.0, delta[i]-cur_slack[i]);
 		}
 
-		mv_iter = 0;
-		if(size_active > 1) {
-			for(j = 0; j < size_active; j++) {
-				if(cur_slack[j] >= cur_slack[mv_iter])
-					mv_iter = j;
-			}
+		mv_iter = -1;
+		mv_iter_shannon = -1;
+		for(j = 0; j < size_active; j++) {
+		  if (slack_or_shannon[j]) {
+		    if(mv_iter_shannon == -1 || cur_slack[j] >= cur_slack[mv_iter_shannon])
+  				mv_iter_shannon = j;
+		  } else {
+  			if(mv_iter == -1 || cur_slack[j] >= cur_slack[mv_iter])
+  				mv_iter = j;
+		  }
 		}
 
-		if(size_active > 1)
-			threshold = cur_slack[mv_iter];
-		else
-			threshold = 0.0;
+    threshold = 0.0; threshold_shannon = 0.0;
+    if (size_active > 1) {
+  		if (mv_iter != -1) threshold = cur_slack[mv_iter];
+  		if (mv_iter_shannon != -1) threshold_shannon = cur_slack[mv_iter_shannon];
+	  }
 
  		new_constraint = find_cutting_plane(ex, fycache, &margin, m, sm, sparm, valid_examples);
     new_constraint_shannon = find_shannon_cutting_plane(ex, probscache, &margin_shannon, m, sm, sparm, valid_examples);

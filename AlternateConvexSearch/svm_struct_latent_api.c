@@ -48,6 +48,7 @@ inline int base2int(char base) {
   return(ans);
 }
 
+// Computes w^\top ( \psi(1, h_position) - \psi(-1, -1) )
 static double
 compute_psi_diff_score (PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int h_position)
 {
@@ -487,7 +488,7 @@ void
 get_y_h_probs (PATTERN *x, LABEL *y, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
 {
   double lossval, sum;
-  int i, h, numPositions, numLabels;
+  int h, numPositions;
     
   sum = 0.0;
   numPositions = get_num_latent_variable_options (*x, sm, sparm);
