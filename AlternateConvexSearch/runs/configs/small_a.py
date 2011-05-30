@@ -17,7 +17,7 @@ This runs the cccp learning algorithm with entropy-difference objectives on a sm
         # 'uncertainty' : ['-c 150 -k 100 -m 1.3 -f 0.55 -x -2.0 --t 1', ''],
         # 'shannon' : ['-c 150 -k 100 -m 1.3 -f 0.55 -x 1.0 --t 1', '']
         'a10' : ['-c 150 -a 10 -k 0 -m 1.3 --t 1', ''],
-        'a100' : ['-c 150 -a 10 -k 0 -m 1.3 --t 1', '']
+        'a100' : ['-c 150 -a 100 -k 0 -m 1.3 --t 1', '']
     },
     
     'raise_errors' : True
