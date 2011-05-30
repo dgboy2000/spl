@@ -82,3 +82,33 @@ double log2 (double x)
   return log (x) / LOG2_E;
 }
 
+void log_matrix_for_matlab (FILE *f, double **mat, int m, int n)
+{
+  long i, j;
+  
+  fprintf (f, "matrix = [");
+  for (i=0; i<m; ++i)
+    {
+      for (j=0; j<n; ++j)
+        {
+          fprintf (f, "%f ", mat[i][j]);
+        }
+      fprintf(f, "; ");
+    }
+  
+  fprintf (f, "];");
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+

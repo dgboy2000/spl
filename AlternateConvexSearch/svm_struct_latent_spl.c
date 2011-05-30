@@ -136,7 +136,7 @@ double current_obj_val(EXAMPLE *ex, double ***probscache, SVECTOR **fycache, lon
   SVECTOR *f, *fy, *fybar, *lhs;
   LABEL       ybar;
   LATENT_VAR hbar;
-  double lossval, margin, margin_shannon;
+  double lossval, margin, lossval_shannon, margin_shannon;
   double *new_constraint, *new_constraint_shannon, *correct_expectation_psi, *incorrect_expectation_psi;
 	double obj = 0.0;
 
@@ -173,12 +173,16 @@ double current_obj_val(EXAMPLE *ex, double ***probscache, SVECTOR **fycache, lon
 		if (C_shannon > 0.0)
 		  {
 		    get_expectation_psi (&ex[i].x, &ex[i].y, &correct_expectation_psi, &incorrect_expectation_psi, probscache[i], sm, sparm);
-        add_vector_nn (new_constraint_shannon, correct_expectation_psi, sm->sizePsi);
-        sub_vector_nn (new_constraint_shannon, incorrect_expectation_psi, sm->sizePsi);
+        lossval_shannon = get_expectation_loss (&ex[i].y, probscache[i], sm, sparm);
+
+        if (lossval_shannon - (sprod_nn(sm->w, correct_expectation_psi, sm->sizePsi) - sprod_nn(sm->w, incorrect_expectation_psi, sm->sizePsi)) > 0) {
+          add_vector_nn (new_constraint_shannon, correct_expectation_psi, sm->sizePsi);
+          sub_vector_nn (new_constraint_shannon, incorrect_expectation_psi, sm->sizePsi);
+          margin_shannon += lossval_shannon;
+        }    
+
         free (correct_expectation_psi);
         free (incorrect_expectation_psi);
-
-        margin_shannon += get_expectation_loss (&ex[i].y, probscache[i], sm, sparm);
 		  }
   }
 
@@ -186,27 +190,23 @@ double current_obj_val(EXAMPLE *ex, double ***probscache, SVECTOR **fycache, lon
   new_constraint = add_list_nn(lhs, sm->sizePsi);
   free_svector(lhs);
 
-	obj = margin;
-	for(i = 1; i < sm->sizePsi+1; i++)
-		obj -= new_constraint[i]*sm->w[i];
+	obj = margin - sprod_nn (sm->w, new_constraint, sm->sizePsi);
 	if(obj < 0.0)
 		obj = 0.0;
 	obj *= C;
+	
 	for(i = 1; i < sm->sizePsi+1; i++)
 		obj += 0.5*sm->w[i]*sm->w[i];
-  free(new_constraint);
   
   if (C_shannon > 0.0)
     {
       // The cutting plane is a constraint averaged over all examples; divide by num examples
-      mult_vector_n (new_constraint_shannon, sm->sizePsi, 1/m);
+      mult_vector_n (new_constraint_shannon, sm->sizePsi, 1.0/m);
       margin_shannon /= m;
       
       double obj_shannon;
       
-      obj_shannon = margin_shannon;
-    	for(i = 1; i < sm->sizePsi+1; i++)
-    		obj_shannon -= new_constraint_shannon[i]*sm->w[i];
+      obj_shannon = margin_shannon - sprod_nn (sm->w, new_constraint_shannon, sm->sizePsi);
     	if(obj_shannon < 0.0)
     	  {
           printf ("WARNING: shannon objective part < 0! (we don't think this should happen)\n");
@@ -214,9 +214,10 @@ double current_obj_val(EXAMPLE *ex, double ***probscache, SVECTOR **fycache, lon
     	  }
     	obj_shannon *= C_shannon;
       obj += obj_shannon;
-      
-      free (new_constraint_shannon);
     }
+
+  free(new_constraint);
+  free (new_constraint_shannon);
 
 	return obj;
 }
@@ -698,9 +699,13 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
     		G[size_active-1][size_active-1] = sprod_ss(dXc[size_active-1]->fvec,dXc[size_active-1]->fvec);
 
     		/* hack: add a constant to the diagonal to make sure G is PSD */
-    		G[size_active-1][size_active-1] += 1e-6;
+    		G[size_active-1][size_active-1] += 1e-5;
    	  }
 
+
+    FILE *G_logfile = fopen ("gramm.debug.mat", "w");
+    log_matrix_for_matlab (G_logfile, G, size_active, size_active);
+    fclose (G_logfile);
 
    	/* solve QP to update alpha */
 		r = mosek_qp_optimize(G, delta, alpha, (long) size_active, C, C_shannon, slack_or_shannon, &cur_obj);
@@ -1132,7 +1137,7 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
                           double *losses, double *slacks, double *entropies, double *novelties, double *difficulties) {
 	long i, j;
   int numPositions;
-	double difficulty, lossval, uncertainty, novelty, *hvScores, scoreSum;
+	double slack, lossval, uncertainty, novelty, *hvScores, scoreSum;
 
 	double uncertaintyWeight = sparm->uncertainty_weight;
   double noveltyWeight = sparm->novelty_weight;
@@ -1150,33 +1155,34 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
 		exampleScores[i].index = i;
 		lossval = loss(ex[i].y,ybar,hbar,sparm);
 		
-		difficulty = 0.0;
+		slack = 0.0;
 		uncertainty = 0.0;
 		novelty = 0.0;
 		
+		// Compute slack regardless of renyi exponent, for logging purposes
+		for (f=fy;f;f=f->next) {
+			j = 0;
+			while (1) {
+				if(!f->words[j].wnum)
+					break;
+				slack -= sm->w[f->words[j].wnum]*f->words[j].weight;
+				j++;
+			}
+		}
+		for (f=fybar;f;f=f->next) {
+			j = 0;
+			while (1) {
+				if(!f->words[j].wnum)
+					break;
+				slack += sm->w[f->words[j].wnum]*f->words[j].weight;
+				j++;
+			}
+		}
+    slack += lossval;
 		
 		if (sparm->renyi_exponent == -1.0)
-		  {
-		    for (f=fy;f;f=f->next) {
-    			j = 0;
-    			while (1) {
-    				if(!f->words[j].wnum)
-    					break;
-    				difficulty -= sm->w[f->words[j].wnum]*f->words[j].weight;
-    				j++;
-    			}
-    		}
-    		for (f=fybar;f;f=f->next) {
-    			j = 0;
-    			while (1) {
-    				if(!f->words[j].wnum)
-    					break;
-    				difficulty += sm->w[f->words[j].wnum]*f->words[j].weight;
-    				j++;
-    			}
-    		}
-    		
-    		exampleScores[i].val = lossval + difficulty;
+		  {	
+    		exampleScores[i].val = slack;
 		  }
 		else if (sparm->renyi_exponent >= 1.0)
       {
@@ -1221,7 +1227,7 @@ sortStruct *get_example_scores(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
     // exampleScores[i].val = (uncertaintyWeight + difficultyWeight)*lossval + difficultyWeight * difficulty + uncertaintyWeight * uncertainty + noveltyWeight * novelty; //score!!
     
     if(losses) losses[i] = lossval;
-    if(slacks) slacks[i] = difficulty;
+    if(slacks) slacks[i] = slack;
     if(entropies) entropies[i] = uncertainty;
     if(novelties) novelties[i] = novelty; 
     if(difficulties) difficulties[i] = exampleScores[i].val; 
@@ -1317,8 +1323,11 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
 		best_w[i] = w[i];
 	nValid = update_valid_examples(w, m, C, fycache, ex, sm, sparm, valid_examples, spl_weight, losses, slacks, entropies, novelties, difficulties);
 	last_relaxed_primal_obj = current_obj_val(ex, probscache, fycache, m, sm, sparm, C, C_shannon, valid_examples);
-	if(nValid < m)
+  printf ("Objective at start of ACS: %f\n", last_relaxed_primal_obj);
+	if(nValid < m) {
+    printf ("DEBUG yop yop CCCP shouldn't be here\n");
 		last_relaxed_primal_obj += (double)(m-nValid)/((double)spl_weight);
+	}
 
 	for (i=0;i<m;i++) {
 		prev_valid_examples[i] = 0;
