@@ -327,12 +327,11 @@ SVECTOR* find_cutting_plane(EXAMPLE *ex, SVECTOR **fycache, double *margin, long
 
 
 
-SVECTOR* find_shannon_cutting_plane(EXAMPLE *ex, double ***probs, double *margin, long m, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm,
-                                   int *valid_examples) {
+SVECTOR* find_shannon_cutting_plane(EXAMPLE *ex, double **correct_expectation_psi, double **incorrect_expectation_psi, double *expectation_loss, double *margin,
+                                    long m, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples) {
   long i, j, k, l;
   double valid_count, loss;
   double *new_constraint;
-  double *correct_expectation_psi, *incorrect_expectation_psi;
 
   SVECTOR *fvec;
   WORD *words;  
@@ -352,17 +351,11 @@ SVECTOR* find_shannon_cutting_plane(EXAMPLE *ex, double ***probs, double *margin
       continue;
     }
     
-    get_expectation_psi (&ex[i].x, &ex[i].y, &correct_expectation_psi, &incorrect_expectation_psi, probs[i], sm, sparm);
-    loss = get_expectation_loss (&ex[i].y, probs[i], sm, sparm);
-    
-    if (loss - (sprod_nn(sm->w, correct_expectation_psi, sm->sizePsi) - sprod_nn(sm->w, incorrect_expectation_psi, sm->sizePsi)) > 0) {
-      add_vector_nn (new_constraint, correct_expectation_psi, sm->sizePsi);
-      sub_vector_nn (new_constraint, incorrect_expectation_psi, sm->sizePsi);
-      *margin += loss;
-    }    
-    
-    free (correct_expectation_psi);
-    free (incorrect_expectation_psi);
+    if (expectation_loss[i] - (sprod_nn(sm->w, correct_expectation_psi[i], sm->sizePsi) - sprod_nn(sm->w, incorrect_expectation_psi[i], sm->sizePsi)) > 0) {
+      add_vector_nn (new_constraint, correct_expectation_psi[i], sm->sizePsi);
+      sub_vector_nn (new_constraint, incorrect_expectation_psi[i], sm->sizePsi);
+      *margin += expectation_loss[i];
+    }
   }
   
   // The cutting plane is a constraint averaged over all examples; divide by num examples
@@ -596,8 +589,18 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
 
   printf("Running structural SVM solver: "); fflush(stdout); 
 
+  double **correct_expectation_psi, **incorrect_expectation_psi, *expectation_loss;
+  correct_expectation_psi = (double **) malloc (m * sizeof (double *));
+  incorrect_expectation_psi = (double **) malloc (m * sizeof (double *));
+  expectation_loss = (double *) calloc (m, sizeof (double));
+  for (i=0; i<m; ++i)
+  {
+    get_expectation_psi (&ex[i].x, &ex[i].y, &correct_expectation_psi[i], &incorrect_expectation_psi[i], probscache[i], sm, sparm);
+    expectation_loss[i] = get_expectation_loss (&ex[i].y, probscache[i], sm, sparm);
+  }
+
   new_constraint = find_cutting_plane(ex, fycache, &margin, m, sm, sparm, valid_examples);
-  new_constraint_shannon = find_shannon_cutting_plane(ex, probscache, &margin_shannon, m, sm, sparm, valid_examples);
+  new_constraint_shannon = find_shannon_cutting_plane(ex, correct_expectation_psi, incorrect_expectation_psi, expectation_loss, &margin_shannon, m, sm, sparm, valid_examples);
   
   // printf ("Found the following first constraint:\n");
   // print_svec (new_constraint);
@@ -784,7 +787,7 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
     }
 
     new_constraint = find_cutting_plane(ex, fycache, &margin, m, sm, sparm, valid_examples);
-    new_constraint_shannon = find_shannon_cutting_plane(ex, probscache, &margin_shannon, m, sm, sparm, valid_examples);
+    new_constraint_shannon = find_shannon_cutting_plane(ex, correct_expectation_psi, incorrect_expectation_psi, expectation_loss, &margin_shannon, m, sm, sparm, valid_examples);
     // printf ("Found the following constraint %d:\n", iter);
     //     print_svec (new_constraint);
     
@@ -818,6 +821,13 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
   free(cur_slack);
   free(idle);
   if (svm_model!=NULL) free_model(svm_model,0);
+  for (i=0; i<m; ++i) {
+    free (correct_expectation_psi[i]);
+    free (incorrect_expectation_psi[i]);
+  }
+  free (correct_expectation_psi);
+  free (incorrect_expectation_psi);
+  free (expectation_loss);
 
   return(primal_obj);
 }
@@ -1323,9 +1333,7 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
     best_w[i] = w[i];
   nValid = update_valid_examples(w, m, C, fycache, ex, sm, sparm, valid_examples, spl_weight, losses, slacks, entropies, novelties, difficulties);
   last_relaxed_primal_obj = current_obj_val(ex, probscache, fycache, m, sm, sparm, C, C_shannon, valid_examples);
-  printf ("Objective at start of ACS: %f\n", last_relaxed_primal_obj);
   if(nValid < m) {
-    printf ("DEBUG yop yop CCCP shouldn't be here\n");
     last_relaxed_primal_obj += (double)(m-nValid)/((double)spl_weight);
   }
 
@@ -1475,8 +1483,9 @@ int main(int argc, char* argv[]) {
   double ***probscache; // [example ind][label ind][hidden var ind]
   
   double decrement;
-  double primal_obj, last_primal_obj;
+  double primal_obj, last_primal_obj, best_primal_obj = DBL_MAX;
   double stop_crit; 
+  int stop_clock; // Stop when this counts down to 0
   char itermodelfile[2000];
 
   /* self-paced learning variables */
@@ -1674,6 +1683,17 @@ int main(int argc, char* argv[]) {
     }
     
     stop_crit = (abs (decrement) < C*epsilon);
+    // if (primal_obj < best_primal_obj - C*epsilon) {
+    //   best_primal_obj = primal_obj;
+    //   stop_clock = 3;
+    //   stop_crit = 0;
+    // } else {
+    //   --stop_clock;
+    //   if (stop_clock <= 0) {
+    //     stop_crit = 1;
+    //   }
+    // }
+    
     /* additional stopping criteria */
     if(nValid < m)
       stop_crit = 0;
