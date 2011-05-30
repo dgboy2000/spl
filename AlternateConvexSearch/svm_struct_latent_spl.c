@@ -54,7 +54,7 @@
 int mosek_qp_optimize(double**, double*, double*, long, double, double, int *, double*);
 int mosek_qp_optimize_old(double**, double*, double*, long, double, double*);
 
-void my_read_input_parameters(int argc, char* argv[], char *trainfile,char *modelfile, char *examplesfile, char *timefile, char *latentfile,char *slackfile, char *uncertaintyfile, char *noveltyfile, char*lossfile, char*fycachefile, char *difficultyfile, LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm,STRUCT_LEARN_PARM *struct_parm, double *init_spl_weight, double*spl_factor);
+void my_read_input_parameters(int argc, char* argv[], char *trainfile,char *modelfile, char *examplesfile, char *timefile, char *latentfile,char *slackfile, char *uncertaintyfile, char *noveltyfile, char*lossfile, char*fycachefile, char *difficultyfile, char *probsfile, LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm,STRUCT_LEARN_PARM *struct_parm, double *init_spl_weight, double*spl_factor);
 
 void my_wait_any_key();
 
@@ -1449,6 +1449,7 @@ int main(int argc, char* argv[]) {
   char difficultyfile[1024];
   char lossfile[1024];
   char fycachefile[1024];
+  char probsfile[1024];
   int MAX_ITER;
   /* new struct variables */
   SVECTOR **fycache, *diff, *fy;
@@ -1474,7 +1475,7 @@ int main(int argc, char* argv[]) {
      
   double *slacks, *entropies, *novelties, *losses, *difficulties;
   /* read input parameters */
-	my_read_input_parameters(argc, argv, trainfile, modelfile, examplesfile, timefile, latentfile, slackfile, uncertaintyfile, noveltyfile, lossfile, fycachefile, difficultyfile,
+	my_read_input_parameters(argc, argv, trainfile, modelfile, examplesfile, timefile, latentfile, slackfile, uncertaintyfile, noveltyfile, lossfile, fycachefile, difficultyfile, probsfile,
                       &learn_parm, &kernel_parm, &sparm, &init_spl_weight, &spl_factor); 
 
   epsilon = learn_parm.eps;
@@ -1607,6 +1608,7 @@ int main(int argc, char* argv[]) {
   FILE *fnovelty = fopen(noveltyfile,"w");
   FILE *fdifficulty = fopen(difficultyfile,"w");
   FILE *floss = fopen(lossfile,"w");
+  FILE *fprobs = fopen(probsfile,"w");
 	clock_t start = clock();
 
 	spl_weight = init_spl_weight;
@@ -1629,6 +1631,10 @@ int main(int argc, char* argv[]) {
       fprintf(fnovelty,"%f ",novelties[i]);
       fprintf(fdifficulty,"%f ",difficulties[i]);
       fprintf(floss,"%f ",losses[i]);
+      
+      fprintf(fprobs, "Example %ld (label %d)\n", i, ex[i].y.label);
+      log_y_h_probs (fprobs, &ex[i].x, probscache[i], &sm, &sparm);
+      
 			if(valid_examples[i]) {
 				nValid++;
 			}
@@ -1640,6 +1646,7 @@ int main(int argc, char* argv[]) {
     fprintf(fnovelty,"\n"); fflush(fnovelty);
     fprintf(fdifficulty,"\n"); fflush(fdifficulty);
     fprintf(floss,"\n"); fflush(floss);
+    fprintf(fprobs,"\n"); fflush(fprobs);
 		clock_t finish = clock();
 		fprintf(ftime,"%f %f\n",primal_obj,(((double)(finish-start))/CLOCKS_PER_SEC)); fflush(ftime);
     
@@ -1708,12 +1715,14 @@ int main(int argc, char* argv[]) {
   fclose(fnovelty);
   fclose(fdifficulty);
   fclose(floss);
+  fclose(fprobs);
   // fclose(ffycache);
   free(slacks);
   free(entropies);
   free(novelties);
   free(difficulties);
   free(losses);
+  free_probscache(probscache, &sm, &sparm);
   
 
   /* write structural model */
@@ -1732,7 +1741,6 @@ int main(int argc, char* argv[]) {
     free_svector(fycache[i]);
   }
   free(fycache);
-
 	free(valid_examples);
    
   return(0); 
@@ -1741,7 +1749,7 @@ int main(int argc, char* argv[]) {
 
 
 
-void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* modelfile, char *examplesfile, char *timefile, char *latentfile,char *slackfile, char *uncertaintyfile, char *noveltyfile, char *lossfile, char *fycachefile, char *difficultyfile,
+void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* modelfile, char *examplesfile, char *timefile, char *latentfile,char *slackfile, char *uncertaintyfile, char *noveltyfile, char *lossfile, char *fycachefile, char *difficultyfile, char *probsfile,
                               LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm,double *init_spl_weight, double *spl_factor) {
   
   long i;
@@ -1763,7 +1771,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
 	*init_spl_weight = 0.0;
 	*spl_factor = 1.3;
 	struct_parm->optimizer_type = 0; /* default: cutting plane, change to 1 for stochastic subgradient descent*/
-  struct_parm->svm_c_shannon = 1.0; /* Constant for the shannon slack in the objective */
+  struct_parm->svm_c_shannon = 0.0; /* Constant for the shannon slack in the objective */
 	struct_parm->init_valid_fraction = 0.5;
   struct_parm->uncertainty_weight = 0.0;
   struct_parm->novelty_weight = 0.0;
@@ -1778,6 +1786,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
 
   for(i=1;(i<argc) && ((argv[i])[0] == '-');i++) {
     switch ((argv[i])[1]) {
+    case 'a': i++; struct_parm->svm_c_shannon=atof(argv[i]); break;
     case 'c': i++; learn_parm->svm_c=atof(argv[i]); break;
     case 'd': i++; kernel_parm->poly_degree=atol(argv[i]); break;
     case 'e': i++; learn_parm->eps=atof(argv[i]); break;
@@ -1831,6 +1840,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
   sprintf(lossfile,"%s.loss",filestub);
 	sprintf(fycachefile,"%s.fycache",filestub);
 	sprintf(difficultyfile,"%s.difficulty",filestub);
+	sprintf(probsfile,"%s.probabilities",filestub);
 
 	/* self-paced learning weight should be non-negative */
 	if(*init_spl_weight < 0.0)

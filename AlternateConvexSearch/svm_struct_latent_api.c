@@ -538,6 +538,37 @@ init_y_h_probs (SAMPLE *sample, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
 }
 
 void
+log_y_h_probs (FILE *f, PATTERN *x, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
+{
+  int y, h, numPositions;
+  for (y=0; y<2; ++y)
+    {
+      numPositions = get_num_latent_variable_options(*x, sm, sparm);
+      for (h=0; h<numPositions; ++h)
+        {
+          fprintf(f, "%f ", probs[y][h]);
+        }
+      fprintf(f, "\n");
+    }
+}
+
+void
+free_probscache (double ***probscache, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
+{
+       int i, j;
+       for (i = 0; i < sm->n; ++i)
+       {
+               for (j = 0; j < 2; ++j)
+               {
+                       free(probscache[i][j]);
+               }
+               free(probscache[i]);
+       }
+       free(probscache);
+}
+
+
+void
 get_expectation_psi (PATTERN *x, LABEL *y, double **correct_expectation_psi, double **incorrect_expectation_psi, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
 {
   int numPositions;

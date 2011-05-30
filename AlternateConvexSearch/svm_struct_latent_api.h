@@ -36,8 +36,10 @@ int get_num_latent_variable_options_HACK(PATTERN x, LABEL y, STRUCTMODEL *sm, ST
 int get_num_latent_variable_options(PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
 
 double ***init_y_h_probs (SAMPLE *s, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
+void free_probscache (double ***probscache, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
 void get_y_h_probs (PATTERN *x, LABEL *y, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
 void get_yhat_hhat_probs_old (PATTERN x, LABEL y, double *correct_probs, double *incorrect_probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
+void log_y_h_probs (FILE *f, PATTERN *x, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
 
 void get_expectation_psi (PATTERN *x, LABEL *y, double **correct_expectation_psi, double **incorrect_expectation_psi, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
 double get_expectation_loss (LABEL *y, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
