@@ -1856,7 +1856,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
     }
 
   }
-  *init_spl_weight = (*init_spl_weight)/learn_parm->svm_c;
+  *init_spl_weight = (*init_spl_weight) / (learn_parm->svm_c + struct_parm->svm_c_shannon);
 
   if(i>=argc) {
     printf("\nNot enough input parameters!\n\n");
