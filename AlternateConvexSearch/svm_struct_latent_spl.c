@@ -1630,6 +1630,17 @@ int main(int argc, char* argv[]) {
   FILE *fdifficulty = fopen(difficultyfile,"w");
   FILE *floss = fopen(lossfile,"w");
   FILE *fprobs = fopen(probsfile,"w");
+  assert (
+    fexamples != NULL &&
+    ftime != NULL &&
+    flatent != NULL &&
+    fslack != NULL &&
+    fentropy != NULL &&
+    fnovelty != NULL &&
+    fdifficulty != NULL &&
+    floss != NULL &&
+    fprobs != NULL
+  );
   clock_t start = clock();
 
   spl_weight = init_spl_weight;
