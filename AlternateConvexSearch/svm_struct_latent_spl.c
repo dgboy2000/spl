@@ -1486,6 +1486,7 @@ int main(int argc, char* argv[]) {
   double primal_obj, last_primal_obj, best_primal_obj = DBL_MAX;
   double stop_crit; 
   int stop_clock; // Stop when this counts down to 0
+  double *best_w = NULL;
   char itermodelfile[2000];
 
   /* self-paced learning variables */
@@ -1665,7 +1666,7 @@ int main(int argc, char* argv[]) {
       fprintf(floss,"%f ",losses[i]);
       
       fprintf(fprobs, "Example %ld (label %d)\n", i, ex[i].y.label);
-      log_y_h_probs (fprobs, &ex[i].x, probscache[i], &sm, &sparm);
+      // log_y_h_probs (fprobs, &ex[i].x, probscache[i], &sm, &sparm);
       
       if(valid_examples[i]) {
         nValid++;
@@ -1694,18 +1695,21 @@ int main(int argc, char* argv[]) {
     }
     
     stop_crit = (abs (decrement) < C*epsilon);
-    // if (primal_obj < best_primal_obj - C*epsilon) {
-    //   best_primal_obj = primal_obj;
-    //   stop_clock = 3;
-    //   stop_crit = 0;
-    // } else {
-    //   --stop_clock;
-    //   if (stop_clock <= 0) {
-    //     stop_crit = 1;
-    //   }
-    // }
     
     /* additional stopping criteria */
+    if (primal_obj < best_primal_obj - C*epsilon) {
+      best_primal_obj = primal_obj;
+      stop_clock = 3;
+      stop_crit = 0;
+      if (!best_w) best_w = (double *) calloc (sm.sizePsi+1, sizeof (double));
+      memcpy (best_w, sm.w, sm.sizePsi+1);
+    } else {
+      --stop_clock;
+      if (stop_clock <= 0) {
+        stop_crit = 1;
+      }
+    }
+    
     if(nValid < m)
       stop_crit = 0;
     if(!latent_update)
@@ -1769,6 +1773,7 @@ int main(int argc, char* argv[]) {
   
 
   /* write structural model */
+  memcpy (sm.w, best_w, sm.sizePsi+1); // make sure the best model is the one that gets written to disk
   write_struct_model(modelfile, &sm, &sparm);
   // skip testing for the moment  
 
