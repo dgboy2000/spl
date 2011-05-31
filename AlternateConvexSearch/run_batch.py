@@ -131,6 +131,11 @@ for alg_name, alg_jobs in jobs.iteritems():
             job_cmd = ' && '.join(seed_jobs[0:3])
         except TypeError:
           import pdb; pdb.set_trace()
+
+        # For DAG parallelizing: print to screen and continue
+        print "%s\n" %job_cmd
+        continue
+          
         print "Executing the following command: %s\n" %job_cmd
         
         status = os.system(job_cmd)
@@ -141,34 +146,34 @@ for alg_name, alg_jobs in jobs.iteritems():
             print "COMMAND FAILED: "+job_cmd
             continue
           
-        training_basename = '%s/motif%s_%d_%s' %(ALG_ROOT, prot, fold, seed)
-        training_error_file = '%s.error.train' %training_basename
-        test_error_file = '%s.error.test' %training_basename
-        
-        training_error = float(open(training_error_file, 'r').read())
-        test_error = float(open(test_error_file, 'r').read())
-        
-        prot_stats['train'].append(training_error)
-        prot_stats['test'].append(test_error)
-        best_seed_stats[alg_name][prot][fold]['train'].append(training_error)
-        best_seed_stats[alg_name][prot][fold]['test'].append(test_error)
-        
-      best_seed_ind = argmin(best_seed_stats[alg_name][prot][fold]['train'])
-      best_train = best_seed_stats[alg_name][prot][fold]['train'][best_seed_ind]
-      best_test = best_seed_stats[alg_name][prot][fold]['test'][best_seed_ind]
-      best_stats_list.append("Alg %s protein %s fold %s error: train %f, test %f" %(alg_name, prot, fold, best_train, best_test))
-        
-      best_seed_stats[alg_name][prot][fold]['train'] = best_train
-      best_seed_stats[alg_name][prot][fold]['test'] = best_test
-        
-    mean_train = mean([best_seed_stats[alg_name][prot][fold]['train'] for fold in best_seed_stats[alg_name][prot]])
-    mean_test = mean([best_seed_stats[alg_name][prot][fold]['test'] for fold in best_seed_stats[alg_name][prot]])
-    avg_prot_list.append("Alg %s protein %s mean error: train %f, test %f" %(alg_name, prot, mean_train, mean_test))
-        
-    summary_stats.append("Stats for protein %s:" %prot)
-    summary_stats.append("Training: n %d, mean %f, stdev %f" %(len(prot_stats['train']), mean(prot_stats['train']), math.sqrt(var(prot_stats['train']))))
-    summary_stats.append("Test: n %d, mean %f, stdev %f" %(len(prot_stats['test']), mean(prot_stats['test']), math.sqrt(var(prot_stats['test']))))
-    alg_stats[prot] = prot_stats
+    #     training_basename = '%s/motif%s_%d_%s' %(ALG_ROOT, prot, fold, seed)
+    #     training_error_file = '%s.error.train' %training_basename
+    #     test_error_file = '%s.error.test' %training_basename
+    #     
+    #     training_error = float(open(training_error_file, 'r').read())
+    #     test_error = float(open(test_error_file, 'r').read())
+    #     
+    #     prot_stats['train'].append(training_error)
+    #     prot_stats['test'].append(test_error)
+    #     best_seed_stats[alg_name][prot][fold]['train'].append(training_error)
+    #     best_seed_stats[alg_name][prot][fold]['test'].append(test_error)
+    #     
+    #   best_seed_ind = argmin(best_seed_stats[alg_name][prot][fold]['train'])
+    #   best_train = best_seed_stats[alg_name][prot][fold]['train'][best_seed_ind]
+    #   best_test = best_seed_stats[alg_name][prot][fold]['test'][best_seed_ind]
+    #   best_stats_list.append("Alg %s protein %s fold %s error: train %f, test %f" %(alg_name, prot, fold, best_train, best_test))
+    #     
+    #   best_seed_stats[alg_name][prot][fold]['train'] = best_train
+    #   best_seed_stats[alg_name][prot][fold]['test'] = best_test
+    #     
+    # mean_train = mean([best_seed_stats[alg_name][prot][fold]['train'] for fold in best_seed_stats[alg_name][prot]])
+    # mean_test = mean([best_seed_stats[alg_name][prot][fold]['test'] for fold in best_seed_stats[alg_name][prot]])
+    # avg_prot_list.append("Alg %s protein %s mean error: train %f, test %f" %(alg_name, prot, mean_train, mean_test))
+    #     
+    # summary_stats.append("Stats for protein %s:" %prot)
+    # summary_stats.append("Training: n %d, mean %f, stdev %f" %(len(prot_stats['train']), mean(prot_stats['train']), math.sqrt(var(prot_stats['train']))))
+    # summary_stats.append("Test: n %d, mean %f, stdev %f" %(len(prot_stats['test']), mean(prot_stats['test']), math.sqrt(var(prot_stats['test']))))
+    # alg_stats[prot] = prot_stats
 
 # print "\n".join(summary_stats)
 print "\n".join(best_stats_list)
