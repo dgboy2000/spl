@@ -1665,7 +1665,7 @@ int main(int argc, char* argv[]) {
       fprintf(fdifficulty,"%f ",difficulties[i]);
       fprintf(floss,"%f ",losses[i]);
       
-      fprintf(fprobs, "Example %ld (label %d)\n", i, ex[i].y.label);
+      // fprintf(fprobs, "Example %ld (label %d)\n", i, ex[i].y.label);
       // log_y_h_probs (fprobs, &ex[i].x, probscache[i], &sm, &sparm);
       
       if(valid_examples[i]) {
