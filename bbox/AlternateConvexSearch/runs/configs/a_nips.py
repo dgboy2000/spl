@@ -15,8 +15,8 @@ This runs a few values of 'a' for nips.
     
     # Each entry is a pair of parameter sets; one set is for training, and the other is the corresponding set for inference
     'param_pairs' : {
-      'c10a1' : ['-c 10 -a 0.8 -o 0 --n 6 -k 0 -m 1.3', '--n 6'],
-      'c10a_half' : ['-c 10 -a 0.4 -o 0 --n 6 -k 50 -m 1.3', '--n 6'],
+      'c10a_0_8' : ['-c 10 -a 0.8 -o 0 --n 6 -k 0 -m 1.3', '--n 6'],
+      'c10a_0_4' : ['-c 10 -a 0.4 -o 0 --n 6 -k 50 -m 1.3', '--n 6']
       # 'cccp_opp_y' : ['-c 10 -o 0 --n 6 -k 0 -m 1.3 --t 1', '--n 6'],
       # 'slack_opp_y' : ['-c 10 -o 0 --n 6 -k 50 -m 1.3 --t 1', '--n 6']
     },
