@@ -81,7 +81,7 @@ for alg_name,param_pair in params['param_pairs'].iteritems():
         test_data = '%s/test%s_%d.data' %(DATA_ROOT, prot, fold)        
         
         training_basename = '%s/motif%s_%d_%s' %(ALG_ROOT, prot, fold, seed)
-        training_model = '%s.model.best' %training_basename
+        training_model = '%s.model' %training_basename
         training_job = "./svm_motif_learn %s %s %s %s"\
           %(training_params, training_data, training_model, training_basename)
 
@@ -110,6 +110,7 @@ best_seed_stats = {}
 best_stats_list = []
 avg_prot_list = []
 summary_stats = []
+comprehensive_stats = []
 for alg_name, alg_jobs in jobs.iteritems():
   ALG_ROOT = RUN_ROOT+'/'+alg_name
   stats[alg_name] = {}
@@ -164,6 +165,11 @@ for alg_name, alg_jobs in jobs.iteritems():
         best_seed_stats[alg_name][prot][fold]['train'].append(training_error)
         best_seed_stats[alg_name][prot][fold]['test'].append(test_error)
         
+        if PRINTONLY:
+          continue
+        
+        comprehensive_stats.append("Alg %s protein %s fold %s seed %s error: train %f, test %f" %(alg_name, prot, fold, seed, training_error, test_error))
+        
       if PRINTONLY:
         continue
       best_seed_ind = argmin(best_seed_stats[alg_name][prot][fold]['train'])
@@ -186,6 +192,7 @@ for alg_name, alg_jobs in jobs.iteritems():
     alg_stats[prot] = prot_stats
 
 # print "\n".join(summary_stats)
+print "\n".join(comprehensive_stats)
 print "\n".join(best_stats_list)
 print "\n".join(avg_prot_list)
 stats_filename = RUN_ROOT+'/STATS'
