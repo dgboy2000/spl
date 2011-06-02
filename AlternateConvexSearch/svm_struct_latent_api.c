@@ -650,6 +650,44 @@ free_probscache (double ***probscache, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm
 }
 
 
+SVECTOR **
+compute_psis_for_label (PATTERN *x, LABEL *y, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
+{
+  int k, numPositions;
+  LATENT_VAR h;
+  SVECTOR **psi_cache, *tmp;
+  
+  numPositions = get_num_latent_variable_options (*x, sm, sparm);
+  psi_cache = (SVECTOR **) malloc (numPositions * sizeof (SVECTOR *));
+  
+  for (k=0; k<numPositions; ++k)
+  {
+    h.position = k;
+    psi_cache[k] = psi(*x, *y, h, sm, sparm);
+  }
+  
+  return psi_cache;
+}
+
+void
+cache_all_psis (PATTERN *x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
+{
+  int k, l, numLabels, numPositions;
+  LABEL y;
+  LATENT_VAR h;
+  
+  numLabels = 2;
+  numPositions = get_num_latent_variable_options (*x, sm, sparm);
+
+  x->psi_cache = (SVECTOR ***) malloc (numLabels * sizeof (SVECTOR **));
+
+  for (k = 0; k < numLabels; ++k)
+  {
+    y.label = (k == 0) ? -1 : 1;
+    x->psi_cache[k] = compute_psis_for_label (x, &y, sm, sparm);
+  }
+}
+
 void
 get_expectation_psi (PATTERN *x, LABEL *y, double **correct_expectation_psi, double **incorrect_expectation_psi, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
 {
@@ -657,7 +695,7 @@ get_expectation_psi (PATTERN *x, LABEL *y, double **correct_expectation_psi, dou
   double *correct_probs, *incorrect_probs, probs_weight;
   LABEL yhat;
   LATENT_VAR h;
-  SVECTOR *cur_psi, *lhs, *f;
+  SVECTOR *cur_psi;
   
   numPositions = get_num_latent_variable_options (*x, sm, sparm);
   
@@ -672,36 +710,23 @@ get_expectation_psi (PATTERN *x, LABEL *y, double **correct_expectation_psi, dou
       incorrect_probs = probs[1];
     }
   
-  lhs = NULL;
+  *correct_expectation_psi = (double *) calloc (sm->sizePsi + 1, sizeof (double));
+  *incorrect_expectation_psi = (double *) calloc (sm->sizePsi + 1, sizeof (double));
+  
   probs_weight = get_weight (correct_probs, numPositions);
   for (h.position=0; h.position<numPositions; ++h.position)
     {
-      cur_psi = psi(*x, *y, h, sm, sparm);
-      for (f=cur_psi;f;f=f->next) {
-        f->factor *= correct_probs[h.position] / probs_weight;
-      }
-      append_svector_list (cur_psi, lhs);
-      lhs = cur_psi;
+      cur_psi = x->psi_cache[y->label == -1 ? 0 : 1][h.position];
+      add_vector_ns (*correct_expectation_psi, cur_psi, correct_probs[h.position] / probs_weight);
     }
-    
-  *correct_expectation_psi = add_list_nn(lhs, sm->sizePsi);
-  free_svector(lhs);
   
-  lhs = NULL;
   yhat.label = -1 * y->label;
   probs_weight = get_weight (incorrect_probs, numPositions);
   for (h.position=0; h.position<numPositions; ++h.position)
     {
-      cur_psi = psi(*x, yhat, h, sm, sparm);
-      for (f=cur_psi;f;f=f->next) {
-        f->factor *= incorrect_probs[h.position] / probs_weight;
-      }
-      append_svector_list (cur_psi, lhs);
-      lhs = cur_psi;
+      cur_psi = x->psi_cache[yhat.label == -1 ? 0 : 1][h.position];
+      add_vector_ns (*incorrect_expectation_psi, cur_psi, incorrect_probs[h.position] / probs_weight);
     }
-    
-  *incorrect_expectation_psi = add_list_nn(lhs, sm->sizePsi);
-  free_svector(lhs);
 }
 
 double get_expectation_loss (LABEL *y, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)

@@ -26,6 +26,7 @@ typedef struct pattern {
   char seq_name[1000];
   int example_type; /* example type (background or not?) for cost */
   double example_cost;
+  SVECTOR ***psi_cache;
 } PATTERN;
 
 typedef struct label {

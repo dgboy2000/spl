@@ -23,3 +23,5 @@ double log2 (double x);
 void log_matrix_for_matlab (FILE *f, double **mat, int m, int n);
 
 void log_vector (FILE *f, double *vector, int numEntries);
+void print_vector_n (double *vector, int numEntries);
+void print_vector_s (SVECTOR *svec);

@@ -223,6 +223,23 @@ void log_vector (FILE *f, double *vector, int numEntries)
   }
 }
 
+void print_vector_n (double *vector, int numEntries)
+{
+  long i;
+  for (i=1; i<=numEntries; ++i)
+  {
+    printf ("%f ", vector[i]);
+  }
+}
+
+void print_vector_s (SVECTOR *svec)
+{
+  WORD *w;
+  for (w = svec->words; w->wnum > 0; ++w)
+  {
+    printf ("%f ", w->weight);
+  }
+}
 
 
 

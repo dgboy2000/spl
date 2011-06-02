@@ -1,4 +1,4 @@
-S/************************************************************************/
+/************************************************************************/
 /*                                                                      */
 /*   svm_struct_latent_spl.c                                            */
 /*                                                                      */
@@ -86,6 +86,41 @@ void find_most_violated_constraint(EXAMPLE *ex, LABEL *ybar, LATENT_VAR *hbar, S
     default: printf ("Unrecognized margin_type '%d'\n", sparm->margin_type);
     exit(1);
   }
+}
+
+double current_shannon_slack_val(EXAMPLE *ex, double **correct_expectation_psi, double **incorrect_expectation_psi, double *expectation_loss, long m, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples) {
+  int i;
+  double *new_constraint_shannon;
+  double margin_shannon;
+  
+  new_constraint_shannon = (double *)calloc(sm->sizePsi+1, sizeof(double));
+  
+  for (i=0;i<m;i++) {
+    if(!valid_examples[i])
+      continue;
+  
+    if (expectation_loss[i] - (sprod_nn(sm->w, correct_expectation_psi[i], sm->sizePsi) - sprod_nn(sm->w, incorrect_expectation_psi[i], sm->sizePsi)) > 0) {
+      add_vector_nn (new_constraint_shannon, correct_expectation_psi[i], sm->sizePsi);
+      sub_vector_nn (new_constraint_shannon, incorrect_expectation_psi[i], sm->sizePsi);
+      margin_shannon += expectation_loss[i];
+    }
+  }
+  
+  mult_vector_n (new_constraint_shannon, sm->sizePsi, 1.0/m);
+  margin_shannon /= m;
+  
+  return margin_shannon - sprod_nn (sm->w, new_constraint_shannon, sm->sizePsi);
+}
+
+double current_shannon_obj_val(EXAMPLE *ex, SVECTOR *new_constraint_shannon, double margin_shannon, long m, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, double C_shannon) {
+  int i;
+  double shannon_slack = margin_shannon - sprod_ns (sm->w, new_constraint_shannon);
+  
+  double norm_w = 0.0;
+  for(i = 1; i < sm->sizePsi+1; i++)
+    norm_w += sm->w[i]*sm->w[i];
+    
+  return 0.5*norm_w + C_shannon*shannon_slack;
 }
 
 double current_obj_val(EXAMPLE *ex, double ***probscache, SVECTOR **fycache, long m, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, double C, double C_shannon, int *valid_examples) {
@@ -783,7 +818,8 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
   free(alpha);
   free(delta);
   free_svector(new_constraint);
-  // free_svector(new_constraint_shannon);
+  if (C_shannon)
+    free_svector(new_constraint_shannon);
   free(cur_slack);
   free(idle);
   if (svm_model!=NULL) free_model(svm_model,0);
@@ -811,6 +847,128 @@ int check_acs_convergence(int *prev_valid_examples, int *valid_examples, long m)
   }
 
   return converged;
+}
+
+
+double subgradient_descent(double *w, long m, int MAX_ITER, double C, double C_shannon, double epsilon, double ***probscache, SVECTOR **fycache, EXAMPLE *ex, 
+                           STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples) {
+  long i,j;
+  double *alpha;
+  SVECTOR *new_constraint_shannon;
+  int iter, stop_crit = 0;
+  double margin_shannon;
+  double primal_obj, best_obj, cur_obj;
+  double *cur_slack = NULL;
+  double lambda = 1 / C_shannon;
+  double mu = 2;
+  double phi_weight, w_weight;
+  
+  // printf ("C_shannon: %f\nlambda: %f\nmu: %f\n", C_shannon, lambda, mu);
+  
+  SVECTOR *f;
+
+  /* set parameters for hideo solver */
+  LEARN_PARM lparm;
+  KERNEL_PARM kparm;
+  MODEL *svm_model=NULL;
+  lparm.biased_hyperplane = 0;
+  lparm.epsilon_crit = MIN(epsilon,0.001);
+  lparm.svm_c = C;
+  lparm.sharedslack = 1;
+  kparm.kernel_type = LINEAR;
+
+  lparm.remove_inconsistent=0;
+  lparm.skip_final_opt_check=0;
+  lparm.svm_maxqpsize=10;
+  lparm.svm_newvarsinqp=0;
+  lparm.svm_iter_to_shrink=-9999;
+  lparm.maxiter=100000;
+  lparm.kernel_cache_size=40;
+  lparm.eps = epsilon; 
+  lparm.transduction_posratio=-1.0;
+  lparm.svm_costratio=1.0;
+  lparm.svm_costratio_unlab=1.0;
+  lparm.svm_unlabbound=1E-5;
+  lparm.epsilon_a=1E-10;  /* changed from 1e-15 */
+  lparm.compute_loo=0;
+  lparm.rho=1.0;
+  lparm.xa_depth=0;
+  strcpy(lparm.alphafile,"");
+  kparm.poly_degree=3;
+  kparm.rbf_gamma=1.0;
+  kparm.coef_lin=1;
+  kparm.coef_const=1;
+  strcpy(kparm.custom,"empty");
+ 
+  iter = 0;
+
+  printf("Running structural SVM solver: "); fflush(stdout); 
+
+  double **correct_expectation_psi, **incorrect_expectation_psi, *expectation_loss;
+  correct_expectation_psi = (double **) malloc (m * sizeof (double *));
+  incorrect_expectation_psi = (double **) malloc (m * sizeof (double *));
+  expectation_loss = (double *) calloc (m, sizeof (double));
+  
+  for (i=0; i<m; ++i)
+  {
+    get_y_h_probs (&ex[i].x, &ex[i].y, probscache[i], sm, sparm);
+    get_expectation_psi (&ex[i].x, &ex[i].y, &correct_expectation_psi[i], &incorrect_expectation_psi[i], probscache[i], sm, sparm);
+    get_expectation_psi (&ex[i].x, &ex[i].y, &correct_expectation_psi[i], &incorrect_expectation_psi[i], probscache[i], sm, sparm);
+    expectation_loss[i] = get_expectation_loss (&ex[i].y, probscache[i], sm, sparm);
+  }
+  new_constraint_shannon = find_shannon_cutting_plane(ex, correct_expectation_psi, incorrect_expectation_psi, expectation_loss, &margin_shannon, m, sm, sparm, valid_examples);
+  
+  best_obj = current_shannon_obj_val(ex, new_constraint_shannon, margin_shannon, m, sm, sparm, C_shannon);
+  
+  
+  // printf ("Found the following first constraint:\n");
+  // print_svec (new_constraint);
+  
+  while(!stop_crit && iter < 20) {
+    iter+=1;
+    printf("."); fflush(stdout);
+
+    mult_vector_n (sm->w, sm->sizePsi, 1 - lambda / ((lambda + mu)*iter));
+    add_vector_ns (sm->w, new_constraint_shannon, 1.0 / ((lambda + mu)*iter));
+    free_svector (new_constraint_shannon);
+    
+    for (i=0; i<m; ++i)
+    {
+      get_y_h_probs (&ex[i].x, &ex[i].y, probscache[i], sm, sparm);
+      free (correct_expectation_psi[i]);
+      free (incorrect_expectation_psi[i]);
+      get_expectation_psi (&ex[i].x, &ex[i].y, &correct_expectation_psi[i], &incorrect_expectation_psi[i], probscache[i], sm, sparm);
+      expectation_loss[i] = get_expectation_loss (&ex[i].y, probscache[i], sm, sparm);
+    }
+    new_constraint_shannon = find_shannon_cutting_plane(ex, correct_expectation_psi, incorrect_expectation_psi, expectation_loss, &margin_shannon, m, sm, sparm, valid_examples);
+
+    cur_obj = current_shannon_obj_val(ex, new_constraint_shannon, margin_shannon, m, sm, sparm, C_shannon);
+    printf ("Last objective is: %f\n", best_obj);
+    printf ("Current objective is: %f\n", cur_obj);
+    if (cur_obj < (best_obj - epsilon)) {
+      best_obj = cur_obj;
+    } else {
+      stop_crit = 1;
+    }
+
+  } // end cutting plane while loop 
+
+  primal_obj = current_obj_val(ex, probscache, fycache, m, sm, sparm, C, C_shannon, valid_examples);
+
+  printf(" Inner loop optimization finished.\n"); fflush(stdout); 
+      
+  /* free memory */
+  free_svector (new_constraint_shannon);
+  if (svm_model!=NULL) free_model(svm_model,0);
+  for (i=0; i<m; ++i) {
+    free (correct_expectation_psi[i]);
+    free (incorrect_expectation_psi[i]);
+  }
+  free (correct_expectation_psi);
+  free (incorrect_expectation_psi);
+  free (expectation_loss);
+
+  return(primal_obj);
 }
 
 /*int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPLE *ex, 
@@ -1274,12 +1432,21 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
       break;
     }
     
-    for (i=0;i<sm->sizePsi+1;i++)
-      w[i] = 0.0;
-    if(!sparm->optimizer_type)
+
+    if(sparm->optimizer_type == 0) {
+      for (i=0;i<sm->sizePsi+1;i++) {
+        w[i] = 0.0;
+      }
       relaxed_primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, C_shannon, epsilon, probscache, fycache, ex, sm, sparm, valid_examples);
-    else
+    }
+    else if (sparm->optimizer_type == 2)
+      relaxed_primal_obj = subgradient_descent(w, m, MAX_ITER, C, C_shannon, epsilon, probscache, fycache, ex, sm, sparm, valid_examples);
+    else {
+      for (i=0;i<sm->sizePsi+1;i++) {
+        w[i] = 0.0;
+      }
       relaxed_primal_obj = stochastic_subgradient_descent(w, m, MAX_ITER, C, C_shannon, epsilon, probscache, fycache, ex, sm, sparm, valid_examples);
+    }
     if(nValid < m)
       relaxed_primal_obj += (double)(m-nValid)/((double)spl_weight);
     decrement = last_relaxed_primal_obj-relaxed_primal_obj;
@@ -1486,6 +1653,7 @@ int main(int argc, char* argv[]) {
   fycache = (SVECTOR**)malloc(m*sizeof(SVECTOR*));
   probscache = init_y_h_probs (&sample, &sm, &sparm);
   for (i=0;i<m;i++) {
+    cache_all_psis (&ex[i].x, &sm, &sparm);
     fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
     diff = add_list_ss(fy);
     free_svector(fy);
