@@ -12,9 +12,9 @@ Final run for NIPS 2011.
     
     # Each entry is a pair of parameter sets; one set is for training, and the other is the corresponding set for inference
     'param_pairs' : {
-      'cccp_a25' : ['-c 150 -a 25 -k 0 -m 1.3 --t 1', ''],
-      'slack_a25' : ['-c 150 -a 25 -k 100 -m 1.3 -f 0.55 --t 1', ''],
-      'shannon_a25' : ['-c 150 -a 25 -k 100 -m 1.3 -f 0.55 -x 1.0 --t 1', '']
+      'cccp_a25' : ['-c 150 -a 25 -k 0 -m 1.3 --t 1', '-s 0.143'],
+      'slack_a25' : ['-c 150 -a 25 -k 100 -m 1.3 -f 0.55 --t 1', '-s 0.143'],
+      'shannon_a25' : ['-c 150 -a 25 -k 100 -m 1.3 -f 0.55 -x 1.0 --t 1', '-s 0.143']
     },
     
     'raise_errors' : True
