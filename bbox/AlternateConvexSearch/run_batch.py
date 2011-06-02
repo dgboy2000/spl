@@ -131,7 +131,7 @@ for alg_name, alg_jobs in jobs.iteritems():
           job_cmd = ' && '.join(seed_jobs[0:3])
       except TypeError:
         import pdb; pdb.set_trace()
-      print "Executing the following command: %s\n" %job_cmd
+      print "%s\n" %job_cmd
       
       # For DAG parallelizing: print to screen and continue
       if PRINTONLY:
