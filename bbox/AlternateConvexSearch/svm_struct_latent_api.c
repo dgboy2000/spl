@@ -109,6 +109,78 @@ SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm) {
   return(sample); 
 }
 
+
+/*ported over from motif*/
+double get_expectation_loss (LABEL *y, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
+{
+  return DELTA;
+}
+
+
+
+
+/*ported over from motif*/
+void
+get_expectation_psi (PATTERN *x, LABEL *y, double**correct_expectation_psi, double**incorrect_expectation_psi, double **probs,STRUCTMODEL*sm, STRUCT_LEARN_PARM *sparm) {
+  int numPositions;
+  double *correct_probs, *incorrect_probs;
+  double probs_weights[2];
+  LABEL yhat;
+  LATENT_VAR h;
+  SVECTOR *cur_psi, *lhs, *f;
+
+  numPositions = get_num_latent_variable_options (*x, sm, sparm);
+
+  lhs = NULL;
+  get_weights (x, y, probscache, probs_weights);
+  for (h.position=0; h.position<numPositions; ++h.position)
+    {
+      cur_psi = psi(*x, *y, h, sm, sparm);
+      for (f=cur_psi;f;f=f->next) {
+        f->factor *= correct_probs[h.position] / probs_weight;
+      }
+      append_svector_list (cur_psi, lhs);
+      lhs = cur_psi;
+    }
+
+  *correct_expectation_psi = add_list_nn(lhs, sm->sizePsi);
+  free_svector(lhs);
+
+  yhat.label = -1 * y->label;
+  probs_weight = get_weight (incorrect_probs, numPositions);
+  for (h.position=0; h.position<numPositions; ++h.position)
+    {
+      cur_psi = psi(*x, yhat, h, sm, sparm);
+      for (f=cur_psi;f;f=f->next) {
+        f->factor *= incorrect_probs[h.position] / probs_weight;
+      }
+      append_svector_list (cur_psi, lhs);
+      lhs = cur_psi;
+    }
+
+  *incorrect_expectation_psi = add_list_nn(lhs, sm->sizePsi);
+  free_svector(lhs);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 double compute_w_T_psi(PATTERN *x, int position_x, int position_y, int class, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
      int i;
      double score = 0.0;
