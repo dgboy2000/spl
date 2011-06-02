@@ -1,3 +1,6 @@
+#ifndef SVM_STRUCT_LATENT_API_TYPES_H
+#define SVM_STRUCT_LATENT_API_TYPES_H
+
 /************************************************************************/
 /*                                                                      */
 /*   svm_struct_latent_api_types.h                                      */
@@ -102,3 +105,4 @@ typedef struct struct_learn_parm {
   double renyi_exponent;
 } STRUCT_LEARN_PARM;
 
+#endif

@@ -28,11 +28,11 @@ clean:
 	rm -f *.o
 	rm -f svm_latent_learn svm_latent_classify
 
-svm_bbox_learn: svm_struct_latent_spl.o svm_common.o mosek_qp_optimize.o svm_struct_latent_api.o SFMT.o
-	$(LD) $(LDFLAGS) svm_struct_latent_spl.o svm_common.o mosek_qp_optimize.o SFMT.o svm_struct_latent_api.o -o svm_bbox_learn $(LIBS) -L$(MSKLIBPATH) $(MSKLINKFLAGS)
+svm_bbox_learn: svm_struct_latent_spl.o svm_common.o mosek_qp_optimize.o svm_struct_latent_api.o SFMT.o svm_struct_latent_utils.o
+	$(LD) $(LDFLAGS) svm_struct_latent_spl.o svm_common.o mosek_qp_optimize.o SFMT.o svm_struct_latent_api.o svm_struct_latent_utils.o -o svm_bbox_learn $(LIBS) -L$(MSKLIBPATH) $(MSKLINKFLAGS)
 
-svm_bbox_classify: svm_struct_latent_classify.o svm_common.o svm_struct_latent_api.o SFMT.o
-	$(LD) $(LDFLAGS) svm_struct_latent_classify.o svm_common.o SFMT.o svm_struct_latent_api.o -o svm_bbox_classify $(LIBS)
+svm_bbox_classify: svm_struct_latent_classify.o svm_common.o svm_struct_latent_api.o SFMT.o svm_struct_latent_utils.o
+	$(LD) $(LDFLAGS) svm_struct_latent_classify.o svm_common.o SFMT.o svm_struct_latent_api.o svm_struct_latent_utils.o -o svm_bbox_classify $(LIBS)
 
 svm_struct_latent_spl.o: svm_struct_latent_spl.c
 	$(CC) -std=c99 -c $(CFLAGS) svm_struct_latent_spl.c -o svm_struct_latent_spl.o
@@ -48,6 +48,9 @@ svm_struct_latent_api.o: svm_struct_latent_api.c svm_struct_latent_api_types.h
 
 svm_struct_latent_classify.o: svm_struct_latent_classify.c
 	$(CC) -c $(CFLAGS) svm_struct_latent_classify.c -o svm_struct_latent_classify.o
+
+svm_struct_latent_utils.o: svm_struct_latent_utils.c svm_struct_latent_utils.h
+	$(CC) -c $(CFLAGS) svm_struct_latent_utils.c -o svm_struct_latent_utils.o
 
 SFMT.o: 
 	$(CC) -c -DMEXP=607 $(SFMTPATH)/SFMT.c -o SFMT.o

@@ -18,7 +18,7 @@
 #include <assert.h>
 #include <string.h>
 #include "./SFMT-src-1.3.3/SFMT.h"
-#include "svm_struct_latent_api_types.h"
+#include "svm_struct_latent_api.h"
 #include "svm_struct_latent_utils.h"
 
 #define MAX_INPUT_LINE_LENGTH 10000
@@ -111,6 +111,32 @@ SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm) {
 }
 
 
+// Get the correct and incorrect weights of a generalized probability
+// distribution (weight <= 1)                                              
+// incorrect_and_correct_weights[0] = incorrect weight                                                                                        
+void get_weights(PATTERN * x, LABEL * y, double **probs, double *incorrect_and_correct_weights, STRUCT_LEARN_PARM * sparm) {
+		 int k, curClass;
+		 incorrect_and_correct_weights[0] = 0.0;
+		 incorrect_and_correct_weights[1] = 0.0;
+
+		 int numPositions = x->width * x->height;
+
+		 for (curClass = 0; curClass < sparm->n_classes;
+		 ++curClass)
+		   {
+		     for (k=0; k<numPositions; ++k)
+		       {
+			 if (curClass == y->label)
+			   {
+			     incorrect_and_correct_weights[0] += probs[curClass][k];
+			   }
+			 else
+			   {
+			     incorrect_and_correct_weights[1] += probs[curClass][k];
+			   }
+		       }
+		   }
+}
 
 
 
@@ -239,7 +265,7 @@ get_expectation_psi (PATTERN *x, LABEL *y, double**correct_expectation_psi, doub
   numPositions = get_num_latent_variable_options (*x, sm, sparm);
 
   lhs = NULL;
-  get_weights (x, y, probs, probs_weights);
+  get_weights (x, y, probs, probs_weights, sparm);
   for (k = 0; k < numPositions; ++k)
     {
       h.position_x = k / x->height;
@@ -256,7 +282,7 @@ get_expectation_psi (PATTERN *x, LABEL *y, double**correct_expectation_psi, doub
   free_svector(lhs);
 
   lhs = NULL;
-  for (j = 0; sparm->n_classes; ++j) {
+  for (j = 0; j < sparm->n_classes; ++j) {
     if (j != y->label) {
       yhat.label = j;
       for (k = 0; k < numPositions; ++k)

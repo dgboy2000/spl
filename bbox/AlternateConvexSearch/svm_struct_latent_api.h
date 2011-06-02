@@ -49,3 +49,4 @@ void free_probscache (double ***probscache, STRUCTMODEL *sm,STRUCT_LEARN_PARM *s
 void log_y_h_probs (FILE *f, PATTERN *x, double **probs, STRUCTMODEL *sm,STRUCT_LEARN_PARM *sparm);
 double *** init_y_h_probs (SAMPLE *sample, STRUCTMODEL *sm,STRUCT_LEARN_PARM *sparm);
 void get_y_h_probs (PATTERN *x, LABEL *y, double **probs, STRUCTMODEL *sm,STRUCT_LEARN_PARM *sparm);
+void get_weights (PATTERN * x, LABEL * y, double **probs, double *incorrect_and_correct_weights, STRUCT_LEARN_PARM * sparm);

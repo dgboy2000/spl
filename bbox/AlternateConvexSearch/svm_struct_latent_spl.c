@@ -61,14 +61,14 @@ void approximate_to_psd(double **G, int size_active, double eps);
 
 void Jacobi_Cyclic_Method(double eigenvalues[], double *eigenvectors, double *A, int n);
 
-double sprod_nn(double *a, double *b, long n) {
-  double ans=0.0;
-  long i;
-  for (i=1;i<n+1;i++) {
-    ans+=a[i]*b[i];
-  }
-  return(ans);
-}
+//double sprod_nn(double *a, double *b, long n) {
+//  double ans=0.0;
+//  long i;
+//  for (i=1;i<n+1;i++) {
+//    ans+=a[i]*b[i];
+//  }
+//  return(ans);
+//}
 
 /*
 void add_vector_nn(double *w, double *dense_x, long n, double factor) {
@@ -79,26 +79,26 @@ void add_vector_nn(double *w, double *dense_x, long n, double factor) {
 }
 */
 
-double* add_list_nn(SVECTOR *a, long totwords) 
+//double* add_list_nn(SVECTOR *a, long totwords) 
      /* computes the linear combination of the SVECTOR list weighted
 	by the factor of each SVECTOR. assumes that the number of
 	features is small compared to the number of elements in the
 	list */
-{
-    SVECTOR *f;
-    long i;
-    double *sum;
+//{
+//    SVECTOR *f;
+//    long i;
+//    double *sum;
 
-    sum=create_nvector(totwords);
+//    sum=create_nvector(totwords);
 
-    for(i=0;i<=totwords;i++) 
-      sum[i]=0;
+//    for(i=0;i<=totwords;i++) 
+//      sum[i]=0;
 
-    for(f=a;f;f=f->next)  
-      add_vector_ns(sum,f,f->factor);
+//    for(f=a;f;f=f->next)  
+//      add_vector_ns(sum,f,f->factor);
 
-    return(sum);
-}
+//    return(sum);
+//}
 
 double array_max (double *array, int numElts)
 {
@@ -214,7 +214,7 @@ double current_obj_val(EXAMPLE *ex, double ***probscache, SVECTOR **fycache, lon
 
 
 double current_obj_val_old(EXAMPLE *ex, SVECTOR **fycache, long m, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, double C, int *valid_examples) {
-
+  assert(0);
   long i, j;
   SVECTOR *f, *fy, *fybar, *lhs;
   LABEL       ybar;
@@ -1186,7 +1186,7 @@ void get_renyi_entropy_diff(int i, sortStruct * exampleScores, EXAMPLE *ex, STRU
       probs[j] = (double*)calloc(numPositions,sizeof(double));
     }
   get_y_h_probs (&(ex[i].x), &(ex[i].y),probs,sm, sparm);
-  get_weights (&(ex[i].x), &(ex[i].y),probs,probs_weights);
+  get_weights (&(ex[i].x), &(ex[i].y),probs,probs_weights, sparm);
   // compute entropy of each half                         
   double correct_entropy = get_renyi_entropy (probs,sparm->renyi_exponent,numPositions, ex[i].y.label, ex[i].y.label+1,-1,probs_weights[1]);
   double incorrect_entropy = get_renyi_entropy (probs,sparm->renyi_exponent, numPositions, 0,sparm->n_classes,ex[i].y.label,probs_weights[0]);
@@ -1362,11 +1362,12 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
 		}
 		for (i=0;i<sm->sizePsi+1;i++)
 			w[i] = 0.0;
-		if(!sparm->optimizer_type)
+		if(!sparm->optimizer_type) {
 		  relaxed_primal_obj = cutting_plane_algorithm(w, m,MAX_ITER,C, C_shannon, epsilon, probscache, fycache, ex, sm, sparm, valid_examples);
-		else
+		} else {
 		  assert(0); /*Changes to stochastic_subgradient_descent() weren't ported over from motif; we don't expect you to use stochastic_subgradient_descent()*/
 			relaxed_primal_obj = stochastic_subgradient_descent(w, m, MAX_ITER, C, epsilon, fycache, ex, sm, sparm, valid_examples);
+		}
 		if(nValid < m)
 			relaxed_primal_obj += (double)(m-nValid)/((double)spl_weight);
 		decrement = last_relaxed_primal_obj-relaxed_primal_obj;
@@ -1573,11 +1574,13 @@ int main(int argc, char* argv[]) {
 		}
 		int initIter;
 		for (initIter=0;initIter<2;initIter++) {
-			if(!sparm.optimizer_type)
+		  if(!sparm.optimizer_type) {
 				primal_obj = cutting_plane_algorithm(w, m,MAX_ITER,C, C_shannon, epsilon, probscache, fycache, ex, &sm, &sparm, valid_examples);
-			else
-				primal_obj = stochastic_subgradient_descent(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples);
-  		for (i=0;i<m;i++) {
+		  } else {
+		      assert(0);
+		      primal_obj = stochastic_subgradient_descent(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples);
+		  }
+		  for (i=0;i<m;i++) {
    	 		free_latent_var(ex[i].h);
    	 		ex[i].h = infer_latent_variables(ex[i].x, ex[i].y, &sm, &sparm);
    		}
@@ -1717,8 +1720,10 @@ int main(int argc, char* argv[]) {
 
 
 	/* write structural model */
-	memcpy (sm.w, best_w, sm.sizePsi+1); // make sure the best model is the one that gets written to disk   
-	write_struct_model(modelfile, &sm, &sparm);
+	/*---COMMENT OUT WHEN RUNNING TESTS!!!---*/
+        memcpy (sm.w, best_w, sm.sizePsi+1); // make sure the best model is the one that gets written to disk   
+	/*---------------------*/
+       write_struct_model(modelfile, &sm, &sparm);
   // skip testing for the moment  
 
   /* free memory */
@@ -1765,7 +1770,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
 	/* default: no self-paced learning */
 	*init_spl_weight = 0.0;
 	*spl_factor = 1.3;
-	struct_parm->optimizer_type = 1; /* default: cutting plane, change to 1 for stochastic subgradient descent*/
+	struct_parm->optimizer_type = 0; /* default: cutting plane, change to 1 for stochastic subgradient descent*/
 	struct_parm->init_valid_fraction = 0.5;
 	struct_parm->margin_type = 0;
 	struct_parm->renyi_exponent = -1.0; // see get_example_scores for what this means
