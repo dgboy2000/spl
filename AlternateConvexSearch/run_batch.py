@@ -81,7 +81,7 @@ for alg_name,param_pair in params['param_pairs'].iteritems():
         test_data = '%s/test%s_%d.data' %(DATA_ROOT, prot, fold)        
         
         training_basename = '%s/motif%s_%d_%s' %(ALG_ROOT, prot, fold, seed)
-        training_model = '%s.model' %training_basename
+        training_model = '%s.model.best' %training_basename
         training_job = "./svm_motif_learn %s %s %s %s"\
           %(training_params, training_data, training_model, training_basename)
 
