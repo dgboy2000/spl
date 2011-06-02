@@ -20,12 +20,12 @@ if len(sys.argv) == 3 and sys.argv[2].lower() == "printonly":
 else:
   PRINTONLY = False
 
-# make_cmd = "make clean && ./run_make"
-make_cmd = "./run_make"
-status = os.system(make_cmd)
-if status:
-  print "MAKE COMMAND FAILED: "+make_cmd
-  sys.exit(1)
+# # make_cmd = "make clean && ./run_make"
+# make_cmd = "./run_make"
+# status = os.system(make_cmd)
+# if status:
+#   print "MAKE COMMAND FAILED: "+make_cmd
+#   sys.exit(1)
 
 # generate a directory that will hold all output for this run
 extension = params['extension']
