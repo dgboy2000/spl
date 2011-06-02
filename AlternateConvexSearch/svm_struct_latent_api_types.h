@@ -96,6 +96,7 @@ typedef struct struct_learn_parm {
 	int rng_seed;
 	int optimizer_type;
   double svm_c_shannon; /* Constant for the shannon slack in the objective */
+  double shannon_weight; /* Fraction of weight on the shannon entropy during inference */
 	double init_valid_fraction;
   double init_valid_fraction_pos;
   double uncertainty_weight;

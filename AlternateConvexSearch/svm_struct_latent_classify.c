@@ -55,7 +55,7 @@ int main(int argc, char* argv[]) {
   
   avgloss = 0.0;
   correct = 0;
-  for (i=0;i<testsample.n;i++) {
+  for (i=0;i<testsample.n;i++) {    
     classify_struct_example(testsample.examples[i].x,&y,&h,&model,&sparm);
     l = loss(testsample.examples[i].y,y,h,&sparm);
     avgloss += l;
@@ -89,10 +89,12 @@ void read_input_parameters(int argc, char **argv, char *testfile, char *modelfil
   /* set default */
   strcpy(modelfile, "svm_model");
   sparm->custom_argc = 0;
+  sparm->shannon_weight = 0.0;
   sparm->reduced_size = 0;
 
   for (i=1;(i<argc)&&((argv[i])[0]=='-');i++) {
     switch ((argv[i])[1]) {
+      case 's': i++; sparm->shannon_weight = atof(argv[i]); break;
       case 'z': i++; sparm->reduced_size = atoi(argv[i]); break;
       case '-': strcpy(sparm->custom_argv[sparm->custom_argc++],argv[i]);i++; strcpy(sparm->custom_argv[sparm->custom_argc++],argv[i]);break;  
       default: printf("\nUnrecognized option %s!\n\n",argv[i]); exit(0);    
