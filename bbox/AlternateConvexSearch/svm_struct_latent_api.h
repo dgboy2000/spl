@@ -43,3 +43,9 @@ void print_latent_var(LATENT_VAR h, FILE *flatent);
 void print_label(LABEL l, FILE *flabel);
 
 
+void get_expectation_psi (PATTERN *x, LABEL *y,double**correct_expectation_psi,double**incorrect_expectation_psi, double**probs,STRUCTMODEL*sm,STRUCT_LEARN_PARM*sparm);
+double get_expectation_loss (LABEL *y, double **probs, STRUCTMODEL *sm,STRUCT_LEARN_PARM *sparm);
+void free_probscache (double ***probscache, STRUCTMODEL *sm,STRUCT_LEARN_PARM *sparm);
+void log_y_h_probs (FILE *f, PATTERN *x, double **probs, STRUCTMODEL *sm,STRUCT_LEARN_PARM *sparm);
+double *** init_y_h_probs (SAMPLE *sample, STRUCTMODEL *sm,STRUCT_LEARN_PARM *sparm);
+void get_y_h_probs (PATTERN *x, LABEL *y, double **probs, STRUCTMODEL *sm,STRUCT_LEARN_PARM *sparm);

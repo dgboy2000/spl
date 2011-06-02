@@ -17,8 +17,9 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
-#include "svm_struct_latent_api_types.h"
 #include "./SFMT-src-1.3.3/SFMT.h"
+#include "svm_struct_latent_api_types.h"
+#include "svm_struct_latent_utils.h"
 
 #define MAX_INPUT_LINE_LENGTH 10000
 
@@ -110,6 +111,113 @@ SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm) {
 }
 
 
+
+
+
+/*ported over from motif*/
+// Compute the joint probability distribution of y and h values for the
+// specified example                                                     
+// Note that each (position_x, position_y) pair is flattened out into one
+// index, namely height * position_x + position_y
+void
+get_y_h_probs (PATTERN *x, LABEL *y, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
+{
+  double lossval, sum;
+  int numPositions, j, k;
+  LABEL yhat;
+  LATENT_VAR h;
+
+  sum = 0.0;
+  numPositions = get_num_latent_variable_options (*x, sm, sparm);
+
+  //compute probabilities
+  for (j = 0; j < sparm->n_classes; ++j) {
+    if (j == y->label) {
+      lossval = 0.0;
+    } else {
+      lossval = DELTA;
+    }
+    yhat.label = j;
+    for (k = 0; k < numPositions; ++k) {
+      h.position_x = k / x->height;
+      h.position_y = k % x->height;
+      probs[j][k] = exp (lossval + compute_w_T_psi (x, h.position_x, h.position_y, j, sm, sparm));
+      sum += probs[j][k];
+    }
+  }
+
+  //and normalize
+  for (j = 0; j < sparm->n_classes; ++j) {
+    for (k = 0; k < numPositions; ++k) {
+      probs[j][k] /= sum;
+    }
+  }
+}
+
+
+
+/*ported over from motif*/
+double ***
+init_y_h_probs (SAMPLE *sample, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
+{
+  int i, j, numExamples;
+  double ***probs;
+
+  numExamples = sample->n;
+  probs = (double ***)malloc(numExamples*sizeof(double**));
+
+  for (i=0; i<numExamples; ++i)
+    {
+      probs[i] = (double **)malloc(sparm->n_classes * sizeof(double *));
+      for (j = 0; j < sparm->n_classes; ++j)
+        {
+          probs[i][j] = (double *)calloc(get_num_latent_variable_options(sample->examples[i].x, sm, sparm), sizeof(double));
+	}
+    }
+
+  return probs;
+}
+
+
+
+
+/*ported over from motif*/
+void
+log_y_h_probs (FILE *f, PATTERN *x, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
+{
+    int j, k, numPositions;
+    numPositions = get_num_latent_variable_options(*x, sm, sparm);
+    for (j = 0; j < sparm->n_classes; ++j)
+      {    
+        for (k = 0; k < numPositions; ++k)
+	  {
+	    fprintf(f, "%f ", probs[j][k]);
+	  }
+	fprintf(f, "\n");
+      }
+}
+
+
+
+
+
+/*ported over from motif*/
+void
+free_probscache (double ***probscache, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
+{
+  int i, j;
+  for (i = 0; i < sm->n; ++i)
+    {
+      for (j = 0; j < sparm->n_classes; ++j)
+        {
+	  free(probscache[i][j]);
+	}
+      free(probscache[i]);
+    }
+  free(probscache);
+}
+
+
 /*ported over from motif*/
 double get_expectation_loss (LABEL *y, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
 {
@@ -122,8 +230,7 @@ double get_expectation_loss (LABEL *y, double **probs, STRUCTMODEL *sm, STRUCT_L
 /*ported over from motif*/
 void
 get_expectation_psi (PATTERN *x, LABEL *y, double**correct_expectation_psi, double**incorrect_expectation_psi, double **probs,STRUCTMODEL*sm, STRUCT_LEARN_PARM *sparm) {
-  int numPositions;
-  double *correct_probs, *incorrect_probs;
+  int numPositions, j, k;
   double probs_weights[2];
   LABEL yhat;
   LATENT_VAR h;
@@ -132,12 +239,14 @@ get_expectation_psi (PATTERN *x, LABEL *y, double**correct_expectation_psi, doub
   numPositions = get_num_latent_variable_options (*x, sm, sparm);
 
   lhs = NULL;
-  get_weights (x, y, probscache, probs_weights);
-  for (h.position=0; h.position<numPositions; ++h.position)
+  get_weights (x, y, probs, probs_weights);
+  for (k = 0; k < numPositions; ++k)
     {
+      h.position_x = k / x->height;
+      h.position_y = k % x->height;
       cur_psi = psi(*x, *y, h, sm, sparm);
       for (f=cur_psi;f;f=f->next) {
-        f->factor *= correct_probs[h.position] / probs_weight;
+        f->factor *= probs[y->label][k] / probs_weights[1];
       }
       append_svector_list (cur_psi, lhs);
       lhs = cur_psi;
@@ -146,37 +255,27 @@ get_expectation_psi (PATTERN *x, LABEL *y, double**correct_expectation_psi, doub
   *correct_expectation_psi = add_list_nn(lhs, sm->sizePsi);
   free_svector(lhs);
 
-  yhat.label = -1 * y->label;
-  probs_weight = get_weight (incorrect_probs, numPositions);
-  for (h.position=0; h.position<numPositions; ++h.position)
-    {
-      cur_psi = psi(*x, yhat, h, sm, sparm);
-      for (f=cur_psi;f;f=f->next) {
-        f->factor *= incorrect_probs[h.position] / probs_weight;
-      }
-      append_svector_list (cur_psi, lhs);
-      lhs = cur_psi;
+  lhs = NULL;
+  for (j = 0; sparm->n_classes; ++j) {
+    if (j != y->label) {
+      yhat.label = j;
+      for (k = 0; k < numPositions; ++k)
+	{
+	  h.position_x = k / x->height;
+	  h.position_y = k % x->height;
+	  cur_psi = psi(*x, yhat, h, sm, sparm);
+	  for (f=cur_psi;f;f=f->next) {
+	    f->factor *= probs[j][k] / probs_weights[0];
+	  }
+	  append_svector_list (cur_psi, lhs);
+	  lhs = cur_psi;
+	}
     }
+  }
 
   *incorrect_expectation_psi = add_list_nn(lhs, sm->sizePsi);
   free_svector(lhs);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

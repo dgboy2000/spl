@@ -24,7 +24,9 @@
 #include <time.h>
 #include <math.h>
 #include "svm_struct_latent_api.h"
+#include "svm_struct_latent_utils.h"
 #include "./svm_light/svm_learn.h"
+#include "./svm_light/svm_common.h"
 
 #define EXPECTED_UNIFORMITY 0.9
 
@@ -42,7 +44,7 @@
 
 #define DEBUG_LEVEL 0
 
-int mosek_qp_optimize(double**, double*, double*, long, double, double*);
+int mosek_qp_optimize(double**, double*, double*, long, double, double,int*, double*);
 
 void my_read_input_parameters(int argc, char* argv[], char *trainfile, char *modelfile, char *examplesfile, char *timefile, char *latentfile,
 			      LEARN_PARM *learn_parm, KERNEL_PARM *kernel_parm, STRUCT_LEARN_PARM *struct_parm, 
@@ -50,8 +52,10 @@ void my_read_input_parameters(int argc, char* argv[], char *trainfile, char *mod
 
 void my_wait_any_key();
 
-int resize_cleanup(int size_active, int **ptr_idle, double **ptr_alpha, double **ptr_delta, DOC ***ptr_dXc,
-		double ***ptr_G, int *mv_iter);
+int resize_cleanup_old(int size_active, int **ptr_idle, double **ptr_alpha, double **ptr_delta, DOC ***ptr_dXc,double ***ptr_G, int *mv_iter);
+
+int resize_cleanup(int size_active, int **ptr_idle, int**ptr_slack_or_shannon, double **ptr_alpha, double**ptr_delta, DOC ***ptr_dXc,double ***ptr_G, int *mv_iter);
+
 
 void approximate_to_psd(double **G, int size_active, double eps);
 
@@ -66,12 +70,14 @@ double sprod_nn(double *a, double *b, long n) {
   return(ans);
 }
 
+/*
 void add_vector_nn(double *w, double *dense_x, long n, double factor) {
   long i;
   for (i=1;i<n+1;i++) {
     w[i]+=factor*dense_x[i];
   }
 }
+*/
 
 double* add_list_nn(SVECTOR *a, long totwords) 
      /* computes the linear combination of the SVECTOR list weighted
@@ -184,8 +190,7 @@ double current_obj_val(EXAMPLE *ex, double ***probscache, SVECTOR **fycache, lon
 
   if (C_shannon > 0.0)
     {
-      // The cutting plane is a constraint averaged over all examples;
-    divide by num examples                                                 
+      // The cutting plane is a constraint averaged over all examples; divide by num examples
       mult_vector_n (new_constraint_shannon, sm->sizePsi, 1.0/m);
     margin_shannon /= m;
     double obj_shannon;
@@ -552,7 +557,7 @@ double stochastic_subgradient_descent(double *w, long m, int MAX_ITER, double C,
   printf(" Inner loop optimization finished.\n"); fflush(stdout); 
 
 	/* return primal objective value */
-	primal_obj = current_obj_val(ex, fycache, m, sm, sparm, C, valid_examples);
+   primal_obj = current_obj_val_old(ex, fycache, m, sm, sparm, C, valid_examples);
 	return(primal_obj);
 
 }
@@ -685,8 +690,7 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C,double 
     dXc[j]->fvec);
       G[j][size_active-1]  = G[size_active-1][j];
     }
-    G[size_active-1][size_active-1] =
-    sprod_ss(dXc[size_active-1]->fvec,dXc[size_active-1]->fvec);
+    G[size_active-1][size_active-1] = sprod_ss(dXc[size_active-1]->fvec,dXc[size_active-1]->fvec);
 
     /* hack: add a constant to the diagonal to make sure G is PSD */
     G[size_active-1][size_active-1] += 1e-6;
@@ -700,9 +704,8 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C,double 
         assert(dXc!=NULL);
         dXc[size_active-1] = (DOC*)malloc(sizeof(DOC));
         dXc[size_active-1]->fvec = new_constraint_shannon;
-        dXc[size_active-1]->slackid = 2; // only one common slackid
-        (one-slack)                                                               
-	  dXc[size_active-1]->costfactor = 1.0;
+        dXc[size_active-1]->slackid = 2; // only one common slackid (one-slack)
+	dXc[size_active-1]->costfactor = 1.0;
 
         delta = (double*)realloc(delta, sizeof(double)*size_active);
         assert(delta!=NULL);
@@ -968,7 +971,7 @@ double cutting_plane_algorithm_old(double *w, long m, int MAX_ITER, double C, do
 		G[size_active-1][size_active-1] += 1e-6;
 
    	/* solve QP to update alpha */
-		r = mosek_qp_optimize(G, delta, alpha, (long) size_active, C, &cur_obj);
+		//r = mosek_qp_optimize(G, delta, alpha,(long)size_active, C, &cur_obj); /*UNCOMMENT ME!!!*/
     /*
     double eps = 1e-12;
     while(r >= 1293 && r <= 1296 && eps<100)
@@ -1045,12 +1048,12 @@ double cutting_plane_algorithm_old(double *w, long m, int MAX_ITER, double C, do
 		if((iter % CLEANUP_CHECK) == 0)
 		{
 			printf("+"); fflush(stdout);
-			size_active = resize_cleanup(size_active, &idle, &alpha, &delta, &dXc, &G, &mv_iter);
+			size_active = resize_cleanup_old(size_active, &idle, &alpha, &delta, &dXc, &G, &mv_iter);
 		}
 
  	} // end cutting plane while loop 
 
-	primal_obj = current_obj_val(ex, fycache, m, sm, sparm, C, valid_examples);
+	primal_obj = current_obj_val_old(ex, fycache, m, sm, sparm, C, valid_examples);
 
   printf(" Inner loop optimization finished.\n"); fflush(stdout); 
       
@@ -1086,22 +1089,8 @@ int check_acs_convergence(int *prev_valid_examples, int *valid_examples, long m)
 	return converged;
 }
 
-// Get the weight of a generalized probability distribution (weight <= 1)
-double
-get_weight (double *probs, int numEntries)
-{
-  int k;
-  double weight;
-
-  weight = 0.0;
-  for (k=0; k<numEntries; ++k)
-    weight += probs[k];
-
-  return weight;
-}
-
-double get_renyi_entropy (double *probs, double alpha, int numEntries) {
-  int k;
+double get_renyi_entropy (double **probs, double alpha, int numPositions,int start_y, int end_y, int avoid_y, double weight) {
+  int j, k;
   double p;
   double entropy = 0.0;
   //printf("uninitialized entropy = %f\n", entropy);
@@ -1112,27 +1101,43 @@ double get_renyi_entropy (double *probs, double alpha, int numEntries) {
 
   if (alpha == 1.0)
     {
-      for (k=0; k<numEntries; ++k)
-        {
-          p = probs[k];
-          if (p > 0)
-	    entropy -= p * log2 (p); //minus rather than plus because log2(p) is negative
-        }
-      entropy /= get_weight (probs, numEntries);
+      for (j = start_y; j < end_y; ++j)
+	{
+	  if (j != avoid_y)
+	    {
+              for (k=0; k<numPositions; ++k)
+                {
+                  p = probs[j][k];
+                  if (p > 0)
+	            entropy -= p * log2 (p); //minus rather than plus because log2(p) is negative
+                }
+	    }
+	}
+      entropy /= weight;
     }
   else
     {
-      double pMax, sum, term1, term2, term3;
-     
-      pMax = array_max (probs, numEntries);
-     
+      double pMax, pMaxMax, sum, term1, term2, term3;
+      pMaxMax = -1.0;
+      
+      for (j = start_y; j < end_y; ++j)
+	{
+          if (j != avoid_y)
+	    {
+	      pMax = array_max (probs[j], numPositions);
+	      if (pMaxMax > pMax) pMaxMax = pMax;
+	    }
+	}
       sum = 0.0;
-      for (k=0; k<numEntries; ++k)
-	sum += pow ((probs[k] / pMax), alpha);
-       
-      term1 = alpha * log2 (pMax);      
+     
+      for (j = start_y; j < end_y; ++j)
+	{
+          for (k=0; k<numPositions; ++k)
+	    sum += pow ((probs[j][k] / pMaxMax), alpha);
+	}
+      term1 = alpha * log2 (pMaxMax);      
       term2 = log2 (sum);
-      term3 = log2 (get_weight (probs, numEntries));
+      term3 = log2 (weight);
      
       entropy = (term1 + term2 - term3) / (1 - alpha);
 
@@ -1164,22 +1169,34 @@ double get_renyi_entropy (double *probs, double alpha, int numEntries) {
 }
 
 void get_renyi_entropy_diff(int i, sortStruct * exampleScores, EXAMPLE *ex, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
-  // calculate the joint probs over yhat, hhat for point i                                                                                    
-  // save correct and incorrectly labeled parts of distribution                                                                               
-  int numLatentOptions = get_num_latent_variable_options(ex[i].x, sm, sparm);
-  int numCorrectPositions = numLatentOptions;
-  int numIncorrectPositions = (sparm->n_classes - 1) * numLatentOptions;
-  double *correct_probs = calloc (numCorrectPositions, sizeof (double));
-  double *incorrect_probs = calloc (numIncorrectPositions, sizeof (double));
-  get_yhat_hhat_probs (ex[i].x, ex[i].y, correct_probs, incorrect_probs,sm, sparm);
-
-  // compute entropy of each half                                                                                                             
-  double correct_entropy = get_renyi_entropy (correct_probs, sparm->renyi_exponent, numCorrectPositions);
-  double incorrect_entropy = get_renyi_entropy (incorrect_probs, sparm->renyi_exponent, numIncorrectPositions);
+  int j;
+  double probs_weights[2];
+  
+  // calculate the joint probs over yhat, hhat for point i            
+  // save correct and incorrectly labeled parts of distribution            
+  int numPositions = get_num_latent_variable_options(ex[i].x, sm, sparm);
+  //int numCorrectPositions = numLatentOptions;
+  //int numIncorrectPositions = (sparm->n_classes - 1) * numLatentOptions;
+  //double *correct_probs = calloc (numCorrectPositions, sizeof (double));
+  //double *incorrect_probs = calloc (numIncorrectPositions, sizeof (double));
+  
+  double **probs = (double**)malloc(sparm->n_classes*sizeof(double*));
+  for (j = 0; j < sparm->n_classes; ++j)
+    {
+      probs[j] = (double*)calloc(numPositions,sizeof(double));
+    }
+  get_y_h_probs (&(ex[i].x), &(ex[i].y),probs,sm, sparm);
+  get_weights (&(ex[i].x), &(ex[i].y),probs,probs_weights);
+  // compute entropy of each half                         
+  double correct_entropy = get_renyi_entropy (probs,sparm->renyi_exponent,numPositions, ex[i].y.label, ex[i].y.label+1,-1,probs_weights[1]);
+  double incorrect_entropy = get_renyi_entropy (probs,sparm->renyi_exponent, numPositions, 0,sparm->n_classes,ex[i].y.label,probs_weights[0]);
 
   exampleScores[i].val = correct_entropy - incorrect_entropy;
-  free(correct_probs);
-  free(incorrect_probs);
+  for (j = 0; j < sparm->n_classes; ++j)
+    {
+      free(probs[j]);
+    }
+  free(probs);
   //printf("renyi entropy diff = %f\n", exampleScores[i].val);
 }
 
@@ -1316,8 +1333,7 @@ double get_init_spl_weight(long m, double C, SVECTOR **fycache, EXAMPLE *ex,
 	return(init_spl_weight);
 }
 
-double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double epsilon, SVECTOR **fycache, EXAMPLE *ex, 
-                               STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight) {
+double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double C_shannon, double epsilon, double ***probscache, SVECTOR **fycache, EXAMPLE *ex, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight) {
 
 	long i;
 	int iter = 0, converged, nValid;
@@ -1329,7 +1345,7 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
 	for (i=0;i<sm->sizePsi+1;i++)
 		best_w[i] = w[i];
 	nValid = update_valid_examples(w, m, C, fycache, ex, sm, sparm, valid_examples, spl_weight);
-	last_relaxed_primal_obj = current_obj_val(ex, fycache, m, sm, sparm, C, valid_examples);
+	last_relaxed_primal_obj = current_obj_val(ex, probscache, fycache,m, sm, sparm, C, C_shannon, valid_examples);
 	if(nValid < m)
 		last_relaxed_primal_obj += (double)(m-nValid)/((double)spl_weight);
 
@@ -1347,8 +1363,9 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
 		for (i=0;i<sm->sizePsi+1;i++)
 			w[i] = 0.0;
 		if(!sparm->optimizer_type)
-			relaxed_primal_obj = cutting_plane_algorithm_old(w, m, MAX_ITER, C, epsilon, fycache, ex, sm, sparm, valid_examples);
+		  relaxed_primal_obj = cutting_plane_algorithm(w, m,MAX_ITER,C, C_shannon, epsilon, probscache, fycache, ex, sm, sparm, valid_examples);
 		else
+		  assert(0); /*Changes to stochastic_subgradient_descent() weren't ported over from motif; we don't expect you to use stochastic_subgradient_descent()*/
 			relaxed_primal_obj = stochastic_subgradient_descent(w, m, MAX_ITER, C, epsilon, fycache, ex, sm, sparm, valid_examples);
 		if(nValid < m)
 			relaxed_primal_obj += (double)(m-nValid)/((double)spl_weight);
@@ -1388,7 +1405,7 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
 	}
 
 	double primal_obj;
-	primal_obj = current_obj_val(ex, fycache, m, sm, sparm, C, prev_valid_examples);
+	primal_obj = current_obj_val(ex, probscache, fycache, m, sm, sparm, C, C_shannon, prev_valid_examples);
 	
 	free(prev_valid_examples);
 	free(best_w);
@@ -1453,7 +1470,7 @@ int main(int argc, char* argv[]) {
   double *w; /* weight vector */
   int outer_iter;
   long m, i;
-  double C, epsilon;
+  double C, C_shannon, epsilon;
   LEARN_PARM learn_parm;
   KERNEL_PARM kernel_parm;
   char trainfile[1024];
@@ -1471,9 +1488,13 @@ int main(int argc, char* argv[]) {
   STRUCT_LEARN_PARM sparm;
   STRUCTMODEL sm;
   
+  double ***probscache; // [example ind][label ind][hidden var ind] 
+
   double decrement;
-  double primal_obj, last_primal_obj;
+  double primal_obj, last_primal_obj, best_primal_obj = DBL_MAX;
   double stop_crit; 
+  int stop_clock; // Stop when this counts down to 0
+  double *best_w = NULL;
 	char itermodelfile[2000];
 
 	/* self-paced learning variables */
@@ -1489,6 +1510,7 @@ int main(int argc, char* argv[]) {
 
   epsilon = learn_parm.eps;
   C = learn_parm.svm_c;
+  C_shannon = sparm.svm_c_shannon;
   MAX_ITER = learn_parm.maxiter;
 
   /* read in examples */
@@ -1530,13 +1552,17 @@ int main(int argc, char* argv[]) {
 
   /* prepare feature vector cache for correct labels with imputed latent variables */
   fycache = (SVECTOR**)malloc(m*sizeof(SVECTOR*));
+  probscache = init_y_h_probs (&sample, &sm, &sparm);
   for (i=0;i<m;i++) {
     fy = psi(ex[i].x, ex[i].y, ex[i].h, &sm, &sparm);
     diff = add_list_ss(fy);
     free_svector(fy);
     fy = diff;
     fycache[i] = fy;
+
+    get_y_h_probs (&ex[i].x, &ex[i].y, probscache[i], &sm, &sparm);
   }
+  // log_fycache (ffycache, fycache, m, -3); 
 
  	/* learn initial weight vector using all training examples */
 	valid_examples = (int *) malloc(m*sizeof(int));
@@ -1548,7 +1574,7 @@ int main(int argc, char* argv[]) {
 		int initIter;
 		for (initIter=0;initIter<2;initIter++) {
 			if(!sparm.optimizer_type)
-				primal_obj = cutting_plane_algorithm_old(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples);
+				primal_obj = cutting_plane_algorithm(w, m,MAX_ITER,C, C_shannon, epsilon, probscache, fycache, ex, &sm, &sparm, valid_examples);
 			else
 				primal_obj = stochastic_subgradient_descent(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples);
   		for (i=0;i<m;i++) {
@@ -1562,7 +1588,9 @@ int main(int argc, char* argv[]) {
      	 free_svector(fy);
      	 fy = diff;
      	 fycache[i] = fy;
+	 get_y_h_probs (&ex[i].x, &ex[i].y, probscache[i], &sm, &sparm);
     	}
+	    // log_fycache (ffycache, fycache, m, initIter-2); 
 		}
 	}
      
@@ -1594,7 +1622,7 @@ int main(int argc, char* argv[]) {
     /* cutting plane algorithm */
     //primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples);
 		/* solve biconvex self-paced learning problem */
-		primal_obj = alternate_convex_search(w, m, MAX_ITER, C, epsilon, fycache, ex, &sm, &sparm, valid_examples, spl_weight);
+    primal_obj = alternate_convex_search(w, m, MAX_ITER, C, C_shannon, epsilon, probscache, fycache, ex, &sm, &sparm, valid_examples, spl_weight);
 		int nValid = 0;
 		for (i=0;i<m;i++) {
 			fprintf(fexamples,"%d ",valid_examples[i]);
@@ -1620,7 +1648,25 @@ int main(int argc, char* argv[]) {
 		}
     
     stop_crit = (decrement<C*epsilon);
-		/* additional stopping criteria */
+
+
+
+    /* additional stopping criteria */
+    if (primal_obj < best_primal_obj - C*epsilon) {
+      best_primal_obj = primal_obj;
+      stop_clock = 3;
+      stop_crit = 0;
+      if (!best_w) best_w = (double *) calloc (sm.sizePsi+1, sizeof(double));
+      memcpy (best_w, sm.w, sm.sizePsi+1);
+    } else {
+      --stop_clock;
+      if (stop_clock <= 0) {
+        stop_crit = 1;
+      }
+    }
+
+
+
 		if(nValid < m)
 			stop_crit = 0;
 		if(!latent_update)
@@ -1664,10 +1710,15 @@ int main(int argc, char* argv[]) {
 	fclose(fexamples);
 	fclose(ftime);
 	fclose(flatent);
-  
 
-  /* write structural model */
-  write_struct_model(modelfile, &sm, &sparm);
+
+
+   free_probscache(probscache, &sm, &sparm);
+
+
+	/* write structural model */
+	memcpy (sm.w, best_w, sm.sizePsi+1); // make sure the best model is the one that gets written to disk   
+	write_struct_model(modelfile, &sm, &sparm);
   // skip testing for the moment  
 
   /* free memory */
@@ -1702,6 +1753,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
   learn_parm->maxiter=20000;
   learn_parm->svm_maxqpsize=100;
   learn_parm->svm_c=100.0;
+  struct_parm->svm_c_shannon = 0.0; /* Constant for the shannon slack in the objective */
   learn_parm->eps=0.001;
   learn_parm->biased_hyperplane=12345; /* store random seed */
   learn_parm->remove_inconsistent=10; 
@@ -1722,6 +1774,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
 
   for(i=1;(i<argc) && ((argv[i])[0] == '-');i++) {
     switch ((argv[i])[1]) {
+    case 'a': i++; struct_parm->svm_c_shannon=atof(argv[i]); break;
     case 'c': i++; learn_parm->svm_c=atof(argv[i]); break;
     case 'e': i++; learn_parm->eps=atof(argv[i]); break;
     case 's': i++; learn_parm->svm_maxqpsize=atol(argv[i]); break; 
@@ -1742,7 +1795,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile, char* mod
     }
 
   }
-	*init_spl_weight = (*init_spl_weight)/learn_parm->svm_c;
+  *init_spl_weight = (*init_spl_weight) / (learn_parm->svm_c + struct_parm->svm_c_shannon);
 
   if(i>=argc) {
     printf("\nNot enough input parameters!\n\n");
@@ -1786,8 +1839,99 @@ void my_wait_any_key()
   (void)getc(stdin);
 }
 
-int resize_cleanup(int size_active, int **ptr_idle, double **ptr_alpha, double **ptr_delta, DOC ***ptr_dXc, 
-		double ***ptr_G, int *mv_iter) {
+
+
+
+int resize_cleanup(int size_active, int **ptr_idle, int
+		   **ptr_slack_or_shannon, double **ptr_alpha, double
+		   **ptr_delta, DOC ***ptr_dXc,
+		   double ***ptr_G, int *mv_iter)
+{
+  int i,j, new_size_active;
+  long k;
+
+  int *idle=*ptr_idle;
+  int *slack_or_shannon=*ptr_slack_or_shannon;
+  double *alpha=*ptr_alpha;
+  double *delta=*ptr_delta;
+  DOC **dXc = *ptr_dXc;
+  double **G = *ptr_G;
+  int new_mv_iter;
+
+  i=0;
+  while ((i<size_active)&&(idle[i]<IDLE_ITER)) i++;
+  j=i;
+  while((j<size_active)&&(idle[j]>=IDLE_ITER)) j++;
+
+  while (j<size_active) {
+      /* copying */
+      alpha[i] = alpha[j];
+      delta[i] = delta[j];
+      slack_or_shannon[i] = slack_or_shannon[j];
+      free(G[i]);
+      G[i] = G[j];
+      G[j] = NULL;
+      free_example(dXc[i],0);
+      dXc[i] = dXc[j];
+      dXc[j] = NULL;
+      if(j == *mv_iter)
+	new_mv_iter = i;
+
+      i++;
+      j++;
+      while((j<size_active)&&(idle[j]>=IDLE_ITER)) j++;
+  }
+  for (k=i;k<size_active;k++) {
+    if (G[k]!=NULL) free(G[k]);
+    if (dXc[k]!=NULL) free_example(dXc[k],0);
+  }
+  *mv_iter = new_mv_iter;
+  new_size_active = i;
+  alpha = (double*)realloc(alpha, sizeof(double)*new_size_active);
+  delta = (double*)realloc(delta, sizeof(double)*new_size_active);
+  slack_or_shannon = (int *) realloc(slack_or_shannon,
+      sizeof(int)*new_size_active);
+  G = (double **) realloc(G, sizeof(double *)*new_size_active);
+  dXc = (DOC**)realloc(dXc, sizeof(DOC*)*new_size_active);
+  assert(dXc!=NULL);
+
+  /* resize idle */
+  i=0;
+  while ((i<size_active)&&(idle[i]<IDLE_ITER)) i++;
+  j=i;
+  while((j<size_active)&&(idle[j]>=IDLE_ITER)) j++;
+
+  while (j<size_active) {
+    idle[i] = idle[j];
+    for (k=0;k<new_size_active;k++) {
+      G[k][i] = G[k][j];
+    }
+    i++;
+    j++;
+    while((j<size_active)&&(idle[j]>=IDLE_ITER)) j++;
+  }
+  idle = (int*)realloc(idle, sizeof(int)*new_size_active);
+  for (k=0;k<new_size_active;k++) {
+    G[k] = (double*)realloc(G[k], sizeof(double)*new_size_active);
+  }
+
+  *ptr_idle = idle;
+  *ptr_slack_or_shannon = slack_or_shannon;
+  *ptr_alpha = alpha;
+  *ptr_delta = delta;
+  *ptr_G = G;
+  *ptr_dXc = dXc;
+
+  return(new_size_active);
+}
+
+
+ 
+
+
+
+
+int resize_cleanup_old(int size_active, int **ptr_idle, double **ptr_alpha, double **ptr_delta, DOC ***ptr_dXc,double ***ptr_G, int *mv_iter) {
   int i,j, new_size_active;
   long k;
 
@@ -1805,7 +1949,7 @@ int resize_cleanup(int size_active, int **ptr_idle, double **ptr_alpha, double *
 
   while (j<size_active) {
     /* copying */
-    alpha[i] = alpha[j];
+   alpha[i] = alpha[j];
     delta[i] = delta[j];
 		free(G[i]);
 		G[i] = G[j];
