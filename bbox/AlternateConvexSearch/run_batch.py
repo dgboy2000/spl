@@ -76,13 +76,17 @@ for alg_name,param_pair in params['param_pairs'].iteritems():
       training_job = "./svm_bbox_learn %s %s %s %s"\
         %(training_params, training_data, training_model, training_basename)
 
+      training_labels_file = '%s.labels.train' %training_basename
+      training_latent_file = '%s.latent.train' %training_basename
       training_error_file = '%s.error.train' %training_basename
-      training_inference_job = "./svm_bbox_classify %s %s %s"\
-        %(training_data, training_model, training_error_file)
+      training_inference_job = "./svm_bbox_classify %s %s %s %s %s %s"\
+        %(inference_params, training_data, training_model, training_labels_file, training_latent_file, training_error_file)
       
+      test_labels_file = '%s.labels.test' %training_basename
+      test_latent_file = '%s.latent.test' %training_basename
       test_error_file = '%s.error.test' %training_basename
-      test_inference_job = "./svm_bbox_classify %s %s %s"\
-        %(test_data, training_model, test_error_file)
+      test_inference_job = "./svm_bbox_classify %s %s %s %s %s %s"\
+        %(inference_params, test_data, training_model, test_labels_file, test_latent_file, test_error_file)
 
       seed_jobs[seed] = [training_job, training_inference_job, test_inference_job, training_model]
 

@@ -1252,7 +1252,6 @@ sortStruct *get_example_scores(long m,double C,SVECTOR **fycache,EXAMPLE *ex,STR
 }
 
 int update_valid_examples(double *w, long m, double C, SVECTOR **fycache, EXAMPLE *ex, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, int *valid_examples, double spl_weight) {
-  printf("1.0 / spl_weight = %f\n", 1.0 / spl_weight);
 	long i, j;
 
 	/* if self-paced learning weight is non-positive, all examples are valid */
