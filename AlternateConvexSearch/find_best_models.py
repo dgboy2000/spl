@@ -144,7 +144,8 @@ for alg_name, alg_jobs in jobs.iteritems():
         model_ind_file = "%s.%s" %(model_file, model_ind_to_s(model_ind))
         while os.path.exists(model_ind_file):          
           training_inference_job = "./svm_motif_classify %s %s %s %s"\
-            %(inference_params, training_data, training_model, training_error_file)
+            %(inference_params, training_data, model_ind_file, training_error_file)
+          print training_inference_job
           os.system(training_inference_job)
           training_error = float(open(training_error_file, 'r').read())
           if training_error < best_error:
@@ -159,6 +160,7 @@ for alg_name, alg_jobs in jobs.iteritems():
         test_inference_job = "./svm_motif_classify %s %s %s %s"\
           %(inference_params, test_data, best_model_file, test_error_file)
         
+        print training_inference_job
         status = os.system(test_inference_job)
         if status:
           if 'raise_errors' in params and params['raise_errors']:
