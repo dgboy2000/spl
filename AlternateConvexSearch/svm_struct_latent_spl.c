@@ -943,8 +943,8 @@ double subgradient_descent(double *w, long m, int MAX_ITER, double C, double C_s
     new_constraint_shannon = find_shannon_cutting_plane(ex, correct_expectation_psi, incorrect_expectation_psi, expectation_loss, &margin_shannon, m, sm, sparm, valid_examples);
 
     cur_obj = current_shannon_obj_val(ex, new_constraint_shannon, margin_shannon, m, sm, sparm, C_shannon);
-    printf ("Last objective is: %f\n", best_obj);
-    printf ("Current objective is: %f\n", cur_obj);
+    // printf ("Last objective is: %f\n", best_obj);
+    // printf ("Current objective is: %f\n", cur_obj);
     if (cur_obj < (best_obj - epsilon)) {
       best_obj = cur_obj;
     } else {
