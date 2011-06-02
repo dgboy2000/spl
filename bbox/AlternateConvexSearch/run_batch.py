@@ -12,8 +12,13 @@ argmax = lambda array: max(izip(array, xrange(len(array))))[1]
 argmin = lambda array: min(izip(array, xrange(len(array))))[1]
 
 print sys.argv
-assert len(sys.argv) == 2, "Correct usage is python run_batch.py [params file]"
+assert len(sys.argv) in [2,3], "Correct usage is python run_batch.py [params file] [mode]"
 execfile(sys.argv[1])
+
+if len(sys.argv) == 3 and sys.argv[2].lower() == "printonly":
+  PRINTONLY = True
+else:
+  PRINTONLY = False
 
 # make_cmd = "make clean && ./run_make"
 make_cmd = "./run_make"
@@ -128,6 +133,11 @@ for alg_name, alg_jobs in jobs.iteritems():
         import pdb; pdb.set_trace()
       print "Executing the following command: %s\n" %job_cmd
       
+      # For DAG parallelizing: print to screen and continue
+      if PRINTONLY:
+        print "%s\n" %job_cmd
+        continue
+        
       status = os.system(job_cmd)
       if status:
         if 'raise_errors' in params and params['raise_errors']:
@@ -146,6 +156,9 @@ for alg_name, alg_jobs in jobs.iteritems():
       best_seed_stats[alg_name][fold]['train'].append(training_error)
       best_seed_stats[alg_name][fold]['test'].append(test_error)
       
+    if PRINTONLY:
+      continue
+        
     best_seed_ind = argmin(best_seed_stats[alg_name][fold]['train'])
     best_train = best_seed_stats[alg_name][fold]['train'][best_seed_ind]
     best_test = best_seed_stats[alg_name][fold]['test'][best_seed_ind]
