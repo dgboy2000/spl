@@ -97,6 +97,7 @@ typedef struct struct_learn_parm {
 	int optimizer_type;
   double svm_c_shannon; /* Constant for the shannon slack in the objective */
   double shannon_weight; /* Fraction of weight on the shannon entropy during inference */
+  char *init_model_file; /* If this is set, load the specified model to initialize the params. */
 	double init_valid_fraction;
   double init_valid_fraction_pos;
   double uncertainty_weight;

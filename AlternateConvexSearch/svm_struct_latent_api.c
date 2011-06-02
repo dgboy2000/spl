@@ -107,7 +107,7 @@ SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm) {
   fp = fopen(file,"r");
   if (fp==NULL) {
     printf("Cannot open input file %s!\n", file);
-	exit(1);
+  exit(1);
   }
   fgets(line, MAX_INPUT_LINE_LENGTH, fp);
   tot_num_examples = atoi(line);
@@ -222,7 +222,7 @@ void init_latent_variables(SAMPLE *sample, LEARN_PARM *lparm, STRUCTMODEL *sm, S
   int i; 
   /* initialize the RNG */
   //init_gen_rand(lparm->biased_hyperplane);
-	init_gen_rand(sparm->rng_seed);
+  init_gen_rand(sparm->rng_seed);
 
   for (i=0;i<sample->n;i++) {
     if (sample->examples[i].y.label==-1) {
@@ -261,8 +261,8 @@ SVECTOR *psi(PATTERN x, LABEL y, LATENT_VAR h, STRUCTMODEL *sm, STRUCT_LEARN_PAR
     for (j=h.position;j<h.position+sparm->motif_length;j++) {
       /* decrement counts in the feature vector */
       count_vector[1+pattern_hash[j]]--;
-    }	
-	
+    } 
+  
     for (j=h.position;j<h.position+sparm->motif_length;j++) {
       count_vector[sm->sizePsi-(4*(j-h.position)+base2int(x.sequence[j]))]++;
     }
@@ -782,7 +782,7 @@ void write_struct_model(char *file, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
   modelfl = fopen(file,"w");
   if (modelfl==NULL) {
     printf("Cannot open model file %s for output!", file);
-	exit(1);
+  exit(1);
   }
   
   /* write model information */
@@ -811,7 +811,7 @@ STRUCTMODEL read_struct_model(char *file, STRUCT_LEARN_PARM *sparm) {
   modelfl = fopen(file,"r");
   if (modelfl==NULL) {
     printf("Cannot open model file %s for input!", file);
-	exit(1);
+    exit(1);
   }
   
   sizePsi = 1;
@@ -831,7 +831,7 @@ STRUCTMODEL read_struct_model(char *file, STRUCT_LEARN_PARM *sparm) {
   
   while (!feof(modelfl)) {
     fscanf(modelfl, "%d:%lf", &fnum, &fweight);
-	sm.w[fnum] = fweight;
+    sm.w[fnum] = fweight;
   }
 
   fclose(modelfl);
@@ -903,7 +903,7 @@ void parse_struct_parameters(STRUCT_LEARN_PARM *sparm) {
   sparm->bg_markov_order = 2;
   sparm->motif_length = 10;
   sparm->false_negative_cost = 1.0;
-	sparm->rng_seed = 0;
+  sparm->rng_seed = 0;
   
   for (i=0;(i<sparm->custom_argc)&&((sparm->custom_argv[i])[0]=='-');i++) {
     switch ((sparm->custom_argv[i])[2]) {
@@ -920,23 +920,23 @@ void parse_struct_parameters(STRUCT_LEARN_PARM *sparm) {
 
 void copy_label(LABEL l1, LABEL *l2)
 {
-	l2->label = l1.label;
+  l2->label = l1.label;
 }
 
 void copy_latent_var(LATENT_VAR lv1, LATENT_VAR *lv2)
 {
-	lv2->position = lv1.position;
+  lv2->position = lv1.position;
 }
 
 void print_latent_var(LATENT_VAR h, FILE *flatent)
 {
-	fprintf(flatent,"%d ",h.position);
-	fflush(flatent);
+  fprintf(flatent,"%d ",h.position);
+  fflush(flatent);
 }
 
 int is_equal_latent_var(LATENT_VAR h1, LATENT_VAR h2)
 {
-	if(h1.position == h2.position)
-		return 1;
-	return 0;
+  if(h1.position == h2.position)
+    return 1;
+  return 0;
 }

@@ -21,3 +21,5 @@ double get_renyi_entropy (double *probs, double alpha, int numEntries);
 double get_weight (double *probs, int numEntries);
 double log2 (double x);
 void log_matrix_for_matlab (FILE *f, double **mat, int m, int n);
+
+void log_vector (FILE *f, double *vector, int numEntries);

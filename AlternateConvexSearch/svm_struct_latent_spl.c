@@ -153,8 +153,11 @@ double current_obj_val(EXAMPLE *ex, double ***probscache, SVECTOR **fycache, lon
     obj = 0.0;
   obj *= C;
   
+  double norm_w = 0.0;
   for(i = 1; i < sm->sizePsi+1; i++)
-    obj += 0.5*sm->w[i]*sm->w[i];
+    norm_w += 0.5*sm->w[i]*sm->w[i];
+  // printf ("||w||^2 = %f\n", norm_w);
+  obj += norm_w;
   
   if (C_shannon > 0.0)
     {
@@ -555,6 +558,11 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
   {
     get_expectation_psi (&ex[i].x, &ex[i].y, &correct_expectation_psi[i], &incorrect_expectation_psi[i], probscache[i], sm, sparm);
     expectation_loss[i] = get_expectation_loss (&ex[i].y, probscache[i], sm, sparm);
+    
+    // FILE *f = fopen ("expectations.log", "a");
+    // log_vector (f, correct_expectation_psi[i], get_num_latent_variable_options (ex[i].x, sm, sparm)+1); fprintf(f, "\n\n");
+    // log_vector (f, incorrect_expectation_psi[i], get_num_latent_variable_options (ex[i].x, sm, sparm)+1); fprintf(f, "\n\n\n");
+    // fclose (f);
   }
 
   new_constraint = find_cutting_plane(ex, fycache, &margin, m, sm, sparm, valid_examples);
@@ -1265,6 +1273,7 @@ double alternate_convex_search(double *w, long m, int MAX_ITER, double C, double
     if(converged) {
       break;
     }
+    
     for (i=0;i<sm->sizePsi+1;i++)
       w[i] = 0.0;
     if(!sparm->optimizer_type)
@@ -1500,6 +1509,15 @@ int main(int argc, char* argv[]) {
         primal_obj = cutting_plane_algorithm(w, m, MAX_ITER, C, C_shannon, epsilon, probscache, fycache, ex, &sm, &sparm, valid_examples);
       else
         primal_obj = stochastic_subgradient_descent(w, m, MAX_ITER, C, C_shannon, epsilon, probscache, fycache, ex, &sm, &sparm, valid_examples);
+      
+      
+      if(sparm.init_model_file)
+      {
+        printf ("Reading initial model %s... ", sparm.init_model_file);
+        read_struct_model (sparm.init_model_file, &sparm);
+        sparm.init_model_file = NULL;
+        printf ("done\n");
+      }
       for (i=0;i<m;i++) {
         free_latent_var(ex[i].h);
         ex[i].h = infer_latent_variables(ex[i].x, ex[i].y, &sm, &sparm);
@@ -1634,6 +1652,14 @@ int main(int argc, char* argv[]) {
  
 
     if(nValid) {
+      if(sparm.init_model_file)
+      {
+        printf ("Reading initial model %s... ", sparm.init_model_file);
+        read_struct_model (sparm.init_model_file, &sparm);
+        sparm.init_model_file = NULL;
+        printf ("done\n");
+      }
+      
       for (i=0;i<m;i++) {
         /* impute latent variable using updated weight vector */
     /* (imputation happens even if imputed latent variables won't be used in inner loop, so that we can still use latent_update as a stopping criterion)*/
@@ -1738,6 +1764,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
   struct_parm->optimizer_type = 0; /* default: cutting plane, change to 1 for stochastic subgradient descent*/
   struct_parm->svm_c_shannon = 0.0; /* Constant for the shannon slack in the objective */
   struct_parm->shannon_weight = 0.0; /* Weight of shannon entropy (only used in inference) */
+  struct_parm->init_model_file = NULL;
   struct_parm->init_valid_fraction = 0.5;
   struct_parm->uncertainty_weight = 0.0;
   struct_parm->novelty_weight = 0.0;
@@ -1758,6 +1785,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
     case 'e': i++; learn_parm->eps=atof(argv[i]); break;
     case 'f': i++; struct_parm->init_valid_fraction = atof(argv[i]); break;
     case 'g': i++; kernel_parm->rbf_gamma=atof(argv[i]); break;
+    case 'i': i++; struct_parm->init_model_file=argv[i]; break;
     case 'k': i++; *init_spl_weight = atof(argv[i]); break;
     case 'm': i++; *spl_factor = atof(argv[i]); break;
     case 'n': i++; learn_parm->maxiter=atol(argv[i]); break;

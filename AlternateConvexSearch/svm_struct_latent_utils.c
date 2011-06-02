@@ -214,6 +214,15 @@ void log_matrix_for_matlab (FILE *f, double **mat, int m, int n)
 }
 
 
+void log_vector (FILE *f, double *vector, int numEntries)
+{
+  long i;
+  for (i=0; i<numEntries; ++i)
+  {
+    fprintf (f, "%f ", vector[i]);
+  }
+}
+
 
 
 
