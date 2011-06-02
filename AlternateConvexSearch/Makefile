@@ -32,7 +32,7 @@ svm_motif_classify: svm_struct_latent_classify.o svm_common.o svm_struct_latent_
 test_mosek: test_mosek.o SFMT.o mosek_api.o
 	$(LD) $(LDFLAGS) test_mosek.o mosek_api.o SFMT.o -o test_mosek $(LIBS) -L$(MSKLIBPATH) $(MSKLINKFLAGS)
 
-svm_struct_latent_spl.o: svm_struct_latent_spl.c
+svm_struct_latent_spl.o: svm_struct_latent_spl.c svm_struct_latent_api_types.h
 	$(CC) -std=c99 -c $(CFLAGS) svm_struct_latent_spl.c -o svm_struct_latent_spl.o
 
 svm_common.o: ./svm_light/svm_common.c ./svm_light/svm_common.h ./svm_light/kernel.h
@@ -53,7 +53,7 @@ mosek_qp_optimize.o: mosek_qp_optimize.c
 svm_struct_latent_api.o: svm_struct_latent_api.c svm_struct_latent_api_types.h
 	$(CC) -c $(CFLAGS) svm_struct_latent_api.c -o svm_struct_latent_api.o
 
-svm_struct_latent_classify.o: svm_struct_latent_classify.c
+svm_struct_latent_classify.o: svm_struct_latent_classify.c svm_struct_latent_api_types.h
 	$(CC) -c $(CFLAGS) svm_struct_latent_classify.c -o svm_struct_latent_classify.o
 
 svm_struct_latent_utils.o: svm_struct_latent_utils.c svm_struct_latent_utils.h
