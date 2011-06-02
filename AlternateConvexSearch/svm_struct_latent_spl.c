@@ -40,9 +40,6 @@
 
 #define MAX_OUTER_ITER 400
 
-#define MAX(x,y) ((x) < (y) ? (y) : (x))
-#define MIN(x,y) ((x) > (y) ? (y) : (x))
-
 #define DEBUG_LEVEL 0
 
 #define ASIGM -1.5
@@ -64,45 +61,6 @@ int resize_cleanup(int size_active, int **ptr_idle, int **ptr_slack_or_shannon, 
 void approximate_to_psd(double **G, int size_active, double eps);
 
 void Jacobi_Cyclic_Method(double eigenvalues[], double *eigenvectors, double *A, int n);
-
-int compare_dbl (const void * a, const void * b)
-{
-  double c = *(double*)a;
-  double d = *(double*)b;
-  if (c < d)
-    return -1;
-  if (c == d)
-    return 0;
-  if (c > d)
-    return 1; 
-}
-
-double array_max (double *array, int numElts)
-{
-  double max = array[0];
-  int i;
-  for (i=1; i<numElts; ++i)
-    max = MAX(array[i], max);
-  return max;
-}
-
-double array_min (double *array, int numElts)
-{
-  double min = array[0];
-  int i;
-  for (i=1; i<numElts; ++i)
-    min = MIN(array[i], min);
-  return min;
-}
-
-double array_median (double *array, int numElts)
-{
-  double * array_copy = calloc (numElts, sizeof (double));
-  memcpy (array_copy, array, numElts);
-  qsort (array_copy, numElts, sizeof (double), compare_dbl);
-  
-  return array[(numElts-1) / 2];
-}
 
 // log_svector (file *, "fycache for asdf: ", asdf);
 void log_fycache (FILE *f, SVECTOR **fycache, int m, int iter)
@@ -990,47 +948,6 @@ double get_entropy(double *distrib, int numEntries) {
   return(entropy);
 }
 
-double
-get_renyi_entropy (double *probs, double alpha, int numEntries)
-{
-  int k;
-  double p, entropy;
-  
-  if (alpha == 1)
-    {
-      entropy = 0.0;
-      for (k=0; k<numEntries; ++k)
-        {          
-          p = probs[k];
-          if (p > 0)
-            entropy -= p * log2 (p);
-        }
-      entropy /= get_weight (probs, numEntries);
-    }
-  else if (alpha > 1)
-    {
-      double pMax, sum, term1, term2, term3;
-      
-      pMax = array_max (probs, numEntries);
-      
-      sum = 0.0;
-      for (k=0; k<numEntries; ++k)
-        sum += pow ((probs[k] / pMax), alpha);
-        
-      term1 = alpha * log2 (pMax);      
-      term2 = log2 (sum);
-      term3 = log2 (get_weight (probs, numEntries));
-      
-      entropy = (term1 + term2 - term3) / (1 - alpha);
-    }
-  else
-    {
-      printf ("WARNING: called get_renyi_entropy for unsupported alpha = %f\n", alpha);
-    }
-  
-  return entropy;
-}
-
 double * get_h_probabilities(PATTERN x, LABEL y, int numPositions, double Asigm, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
   double * hvScores = malloc(numPositions * sizeof(double));
   get_latent_variable_scores(x, y, hvScores, sm, sparm); 
@@ -1820,6 +1737,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
   *spl_factor = 1.3;
   struct_parm->optimizer_type = 0; /* default: cutting plane, change to 1 for stochastic subgradient descent*/
   struct_parm->svm_c_shannon = 0.0; /* Constant for the shannon slack in the objective */
+  struct_parm->shannon_weight = 0.0; /* Weight of shannon entropy (only used in inference) */
   struct_parm->init_valid_fraction = 0.5;
   struct_parm->uncertainty_weight = 0.0;
   struct_parm->novelty_weight = 0.0;

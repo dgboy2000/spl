@@ -21,7 +21,10 @@ SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm);
 void init_struct_model(SAMPLE sample, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm, LEARN_PARM *lparm, KERNEL_PARM *kparm);
 void init_latent_variables(SAMPLE *sample, LEARN_PARM *lparm, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
 SVECTOR *psi(PATTERN x, LABEL y, LATENT_VAR h, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
+
 void classify_struct_example(PATTERN x, LABEL *y, LATENT_VAR *h, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
+void classify_struct_example_old(PATTERN x, LABEL *y, LATENT_VAR *h, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
+
 void find_most_violated_constraint_marginrescaling(EXAMPLE *ex, LABEL *ybar, LATENT_VAR *hbar, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
 void find_most_violated_constraint_oppositey(EXAMPLE *ex, LABEL *ybar, LATENT_VAR *hbar, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
 SVECTOR **get_all_psi(EXAMPLE *ex, int exNum, int *numPairs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
@@ -38,6 +41,7 @@ int get_num_latent_variable_options(PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PAR
 double ***init_y_h_probs (SAMPLE *s, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
 void free_probscache (double ***probscache, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
 void get_y_h_probs (PATTERN *x, LABEL *y, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
+void get_y_h_probs_label_independent (PATTERN *x, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
 void get_yhat_hhat_probs_old (PATTERN x, LABEL y, double *correct_probs, double *incorrect_probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
 void log_y_h_probs (FILE *f, PATTERN *x, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
 

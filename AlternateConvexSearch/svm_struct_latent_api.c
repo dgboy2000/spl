@@ -18,7 +18,7 @@
 #include <assert.h>
 #include <string.h>
 #include <math.h>
-#include "svm_struct_latent_api_types.h"
+#include "svm_struct_latent_api.h"
 #include "svm_struct_latent_utils.h"
 #include "./SFMT-src-1.3.3/SFMT.h"
 
@@ -321,7 +321,7 @@ SVECTOR **get_all_psi(EXAMPLE *ex, int exNum, int *numPairs, STRUCTMODEL *sm, ST
 }
 
 
-void classify_struct_example(PATTERN x, LABEL *y, LATENT_VAR *h, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+void classify_struct_example_old(PATTERN x, LABEL *y, LATENT_VAR *h, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
 /*
   Makes prediction with input pattern x with weight vector in sm->w,
   i.e., computing argmax_{(y,h)} <w,psi(x,y,h)>. 
@@ -341,6 +341,55 @@ void classify_struct_example(PATTERN x, LABEL *y, LATENT_VAR *h, STRUCTMODEL *sm
     y->label = 1;
   } else {
     y->label = -1;
+  }
+}
+
+void classify_struct_example(PATTERN x, LABEL *y, LATENT_VAR *h, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+/*
+  Makes prediction with input pattern x with weight vector in sm->w,
+  with the specified fraction of weight on the shannon criteria, the remaining
+  weight on the alpha=infinity criteria.
+  Output pair (y,h) are stored at location pointed to by 
+  pointers *y and *h. 
+*/
+  
+  //y = (LABEL*)malloc(sizeof(LABEL));
+  //h = (LATENT_VAR*)malloc(sizeof(LATENT_VAR));
+  
+  double **probs, *shannon_entropies, *infty_entropies, min_score, score;
+  int i, min_label, numLabels, numPositions;
+  LABEL y_hat;  
+  
+  numLabels = 2;
+  numPositions = get_num_latent_variable_options (x, sm, sparm);
+  probs = (double **) malloc (numLabels * sizeof (double *));
+  shannon_entropies = (double *) calloc (numLabels, sizeof (double));
+  infty_entropies = (double *) calloc (numLabels, sizeof (double));
+  for (i=0; i<numLabels; ++i)
+  {
+    probs[i] = (double *) calloc (numPositions, sizeof (double));      
+  }
+  get_y_h_probs_label_independent (&x, probs, sm, sparm);
+  
+  min_score = DBL_MAX;
+  for (i=0; i<numLabels; ++i)
+  {
+    shannon_entropies[i] = get_renyi_entropy (probs[i], 1, numPositions);
+    infty_entropies[i] = -log2 (array_max (probs[i], numPositions));
+    score = sparm->shannon_weight*shannon_entropies[i] + (1-sparm->shannon_weight)*infty_entropies[i];
+    if (score < min_score)
+    {
+      min_score = score;
+      min_label = i;
+    }
+  }
+
+  if (min_label == 0) {
+    y->label = -1;
+    h->position = 1;
+  } else {
+    y->label = 1;
+    h->position = array_argmax (probs[1], numPositions);
   }
 }
 
@@ -506,6 +555,38 @@ get_y_h_probs (PATTERN *x, LABEL *y, double **probs, STRUCTMODEL *sm, STRUCT_LEA
   for (h=0; h < numPositions; h++)
     {
       probs[0][h] = exp (lossval);
+      sum += probs[0][h];
+    }
+
+  // normalize the probabilities
+  for (h=0; h < numPositions; ++h)
+    {
+      probs[0][h] /= sum;
+      probs[1][h] /= sum;
+    }
+}
+
+// Compute the joint probability distribution of y and h values for the specified example. Leave out the loss function
+void
+get_y_h_probs_label_independent (PATTERN *x, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
+{
+  double sum;
+  int h, numPositions;
+    
+  sum = 0.0;
+  numPositions = get_num_latent_variable_options (*x, sm, sparm);
+
+  // compute positive scores
+  for (h=0; h < numPositions; h++)
+    {
+      probs[1][h] = exp (compute_psi_diff_score(*x, sm, sparm, h));
+      sum += probs[1][h];
+    }
+
+  // compute negative scores
+  for (h=0; h < numPositions; h++)
+    {
+      probs[0][h] = 1;
       sum += probs[0][h];
     }
 
