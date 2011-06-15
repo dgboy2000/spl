@@ -32,7 +32,7 @@
 
 #define ALPHA_THRESHOLD 1E-14
 #define IDLE_ITER 20
-#define CLEANUP_CHECK 50
+#define CLEANUP_CHECK 25
 #define STOP_PREC 1E-2
 #define UPDATE_BOUND 3
 #define MAX_CURRICULUM_ITER 10
@@ -789,6 +789,16 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C,double 
       idle[j]++;
   }
 
+
+
+  /*---TEMPORARY---*/
+  //for (j = 0; j < size_active; ++j) {
+  // printf("constraint %d idle for %d steps\n", j, idle[j]);
+  //}
+  /*---------------*/
+
+
+
   cur_slack = (double *) realloc(cur_slack,sizeof(double)*size_active);
 
   for(i = 0; i < size_active; i++) {
@@ -833,6 +843,7 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C,double 
     {
       printf("+"); fflush(stdout);
       size_active = resize_cleanup(size_active, &idle, &slack_or_shannon,&alpha, &delta, &dXc, &G, &mv_iter);
+      printf("size_active = %d\n", size_active);
     }
   } // end cutting plane while loop                                                                                                         
 
@@ -1048,7 +1059,7 @@ double cutting_plane_algorithm_old(double *w, long m, int MAX_ITER, double C, do
 		if((iter % CLEANUP_CHECK) == 0)
 		{
 			printf("+"); fflush(stdout);
-			size_active = resize_cleanup_old(size_active, &idle, &alpha, &delta, &dXc, &G, &mv_iter);
+			//size_active = resize_cleanup_old(size_active, &idle, &alpha, &delta, &dXc, &G, &mv_iter);
 		}
 
  	} // end cutting plane while loop 
@@ -1847,10 +1858,7 @@ void my_wait_any_key()
 
 
 
-int resize_cleanup(int size_active, int **ptr_idle, int
-		   **ptr_slack_or_shannon, double **ptr_alpha, double
-		   **ptr_delta, DOC ***ptr_dXc,
-		   double ***ptr_G, int *mv_iter)
+int resize_cleanup(int size_active, int **ptr_idle, int**ptr_slack_or_shannon, double **ptr_alpha, double**ptr_delta, DOC ***ptr_dXc,double ***ptr_G, int *mv_iter)
 {
   int i,j, new_size_active;
   long k;
@@ -1870,6 +1878,7 @@ int resize_cleanup(int size_active, int **ptr_idle, int
 
   while (j<size_active) {
       /* copying */
+
       alpha[i] = alpha[j];
       delta[i] = delta[j];
       slack_or_shannon[i] = slack_or_shannon[j];
@@ -1894,8 +1903,7 @@ int resize_cleanup(int size_active, int **ptr_idle, int
   new_size_active = i;
   alpha = (double*)realloc(alpha, sizeof(double)*new_size_active);
   delta = (double*)realloc(delta, sizeof(double)*new_size_active);
-  slack_or_shannon = (int *) realloc(slack_or_shannon,
-      sizeof(int)*new_size_active);
+  slack_or_shannon = (int *) realloc(slack_or_shannon,sizeof(int)*new_size_active);
   G = (double **) realloc(G, sizeof(double *)*new_size_active);
   dXc = (DOC**)realloc(dXc, sizeof(DOC*)*new_size_active);
   assert(dXc!=NULL);
