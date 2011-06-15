@@ -107,7 +107,7 @@ SAMPLE read_struct_examples(char *file, STRUCT_LEARN_PARM *sparm) {
   fp = fopen(file,"r");
   if (fp==NULL) {
     printf("Cannot open input file %s!\n", file);
-	exit(1);
+  exit(1);
   }
   fgets(line, MAX_INPUT_LINE_LENGTH, fp);
   tot_num_examples = atoi(line);
@@ -222,7 +222,7 @@ void init_latent_variables(SAMPLE *sample, LEARN_PARM *lparm, STRUCTMODEL *sm, S
   int i; 
   /* initialize the RNG */
   //init_gen_rand(lparm->biased_hyperplane);
-	init_gen_rand(sparm->rng_seed);
+  init_gen_rand(sparm->rng_seed);
 
   for (i=0;i<sample->n;i++) {
     if (sample->examples[i].y.label==-1) {
@@ -261,8 +261,8 @@ SVECTOR *psi(PATTERN x, LABEL y, LATENT_VAR h, STRUCTMODEL *sm, STRUCT_LEARN_PAR
     for (j=h.position;j<h.position+sparm->motif_length;j++) {
       /* decrement counts in the feature vector */
       count_vector[1+pattern_hash[j]]--;
-    }	
-	
+    } 
+  
     for (j=h.position;j<h.position+sparm->motif_length;j++) {
       count_vector[sm->sizePsi-(4*(j-h.position)+base2int(x.sequence[j]))]++;
     }
@@ -650,6 +650,44 @@ free_probscache (double ***probscache, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm
 }
 
 
+SVECTOR **
+compute_psis_for_label (PATTERN *x, LABEL *y, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
+{
+  int k, numPositions;
+  LATENT_VAR h;
+  SVECTOR **psi_cache, *tmp;
+  
+  numPositions = get_num_latent_variable_options (*x, sm, sparm);
+  psi_cache = (SVECTOR **) malloc (numPositions * sizeof (SVECTOR *));
+  
+  for (k=0; k<numPositions; ++k)
+  {
+    h.position = k;
+    psi_cache[k] = psi(*x, *y, h, sm, sparm);
+  }
+  
+  return psi_cache;
+}
+
+void
+cache_all_psis (PATTERN *x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
+{
+  int k, l, numLabels, numPositions;
+  LABEL y;
+  LATENT_VAR h;
+  
+  numLabels = 2;
+  numPositions = get_num_latent_variable_options (*x, sm, sparm);
+
+  x->psi_cache = (SVECTOR ***) malloc (numLabels * sizeof (SVECTOR **));
+
+  for (k = 0; k < numLabels; ++k)
+  {
+    y.label = (k == 0) ? -1 : 1;
+    x->psi_cache[k] = compute_psis_for_label (x, &y, sm, sparm);
+  }
+}
+
 void
 get_expectation_psi (PATTERN *x, LABEL *y, double **correct_expectation_psi, double **incorrect_expectation_psi, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
 {
@@ -657,7 +695,7 @@ get_expectation_psi (PATTERN *x, LABEL *y, double **correct_expectation_psi, dou
   double *correct_probs, *incorrect_probs, probs_weight;
   LABEL yhat;
   LATENT_VAR h;
-  SVECTOR *cur_psi, *lhs, *f;
+  SVECTOR *cur_psi;
   
   numPositions = get_num_latent_variable_options (*x, sm, sparm);
   
@@ -672,36 +710,23 @@ get_expectation_psi (PATTERN *x, LABEL *y, double **correct_expectation_psi, dou
       incorrect_probs = probs[1];
     }
   
-  lhs = NULL;
+  *correct_expectation_psi = (double *) calloc (sm->sizePsi + 1, sizeof (double));
+  *incorrect_expectation_psi = (double *) calloc (sm->sizePsi + 1, sizeof (double));
+  
   probs_weight = get_weight (correct_probs, numPositions);
   for (h.position=0; h.position<numPositions; ++h.position)
     {
-      cur_psi = psi(*x, *y, h, sm, sparm);
-      for (f=cur_psi;f;f=f->next) {
-        f->factor *= correct_probs[h.position] / probs_weight;
-      }
-      append_svector_list (cur_psi, lhs);
-      lhs = cur_psi;
+      cur_psi = x->psi_cache[y->label == -1 ? 0 : 1][h.position];
+      add_vector_ns (*correct_expectation_psi, cur_psi, correct_probs[h.position] / probs_weight);
     }
-    
-  *correct_expectation_psi = add_list_nn(lhs, sm->sizePsi);
-  free_svector(lhs);
   
-  lhs = NULL;
   yhat.label = -1 * y->label;
   probs_weight = get_weight (incorrect_probs, numPositions);
   for (h.position=0; h.position<numPositions; ++h.position)
     {
-      cur_psi = psi(*x, yhat, h, sm, sparm);
-      for (f=cur_psi;f;f=f->next) {
-        f->factor *= incorrect_probs[h.position] / probs_weight;
-      }
-      append_svector_list (cur_psi, lhs);
-      lhs = cur_psi;
+      cur_psi = x->psi_cache[yhat.label == -1 ? 0 : 1][h.position];
+      add_vector_ns (*incorrect_expectation_psi, cur_psi, incorrect_probs[h.position] / probs_weight);
     }
-    
-  *incorrect_expectation_psi = add_list_nn(lhs, sm->sizePsi);
-  free_svector(lhs);
 }
 
 double get_expectation_loss (LABEL *y, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm)
@@ -782,7 +807,7 @@ void write_struct_model(char *file, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
   modelfl = fopen(file,"w");
   if (modelfl==NULL) {
     printf("Cannot open model file %s for output!", file);
-	exit(1);
+  exit(1);
   }
   
   /* write model information */
@@ -811,7 +836,7 @@ STRUCTMODEL read_struct_model(char *file, STRUCT_LEARN_PARM *sparm) {
   modelfl = fopen(file,"r");
   if (modelfl==NULL) {
     printf("Cannot open model file %s for input!", file);
-	exit(1);
+    exit(1);
   }
   
   sizePsi = 1;
@@ -831,7 +856,7 @@ STRUCTMODEL read_struct_model(char *file, STRUCT_LEARN_PARM *sparm) {
   
   while (!feof(modelfl)) {
     fscanf(modelfl, "%d:%lf", &fnum, &fweight);
-	sm.w[fnum] = fweight;
+    sm.w[fnum] = fweight;
   }
 
   fclose(modelfl);
@@ -903,7 +928,7 @@ void parse_struct_parameters(STRUCT_LEARN_PARM *sparm) {
   sparm->bg_markov_order = 2;
   sparm->motif_length = 10;
   sparm->false_negative_cost = 1.0;
-	sparm->rng_seed = 0;
+  sparm->rng_seed = 0;
   
   for (i=0;(i<sparm->custom_argc)&&((sparm->custom_argv[i])[0]=='-');i++) {
     switch ((sparm->custom_argv[i])[2]) {
@@ -920,23 +945,23 @@ void parse_struct_parameters(STRUCT_LEARN_PARM *sparm) {
 
 void copy_label(LABEL l1, LABEL *l2)
 {
-	l2->label = l1.label;
+  l2->label = l1.label;
 }
 
 void copy_latent_var(LATENT_VAR lv1, LATENT_VAR *lv2)
 {
-	lv2->position = lv1.position;
+  lv2->position = lv1.position;
 }
 
 void print_latent_var(LATENT_VAR h, FILE *flatent)
 {
-	fprintf(flatent,"%d ",h.position);
-	fflush(flatent);
+  fprintf(flatent,"%d ",h.position);
+  fflush(flatent);
 }
 
 int is_equal_latent_var(LATENT_VAR h1, LATENT_VAR h2)
 {
-	if(h1.position == h2.position)
-		return 1;
-	return 0;
+  if(h1.position == h2.position)
+    return 1;
+  return 0;
 }

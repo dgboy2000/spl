@@ -20,12 +20,12 @@ if len(sys.argv) == 3 and sys.argv[2].lower() == "printonly":
 else:
   PRINTONLY = False
 
-# make_cmd = "make clean && ./run_make"
-make_cmd = "./run_make"
-status = os.system(make_cmd)
-if status:
-  print "MAKE COMMAND FAILED: "+make_cmd
-  sys.exit(1)
+# # make_cmd = "make clean && ./run_make"
+# make_cmd = "./run_make"
+# status = os.system(make_cmd)
+# if status:
+#   print "MAKE COMMAND FAILED: "+make_cmd
+#   sys.exit(1)
 
 # generate a directory that will hold all output for this run
 extension = params['extension']
@@ -139,7 +139,7 @@ for alg_name, alg_jobs in jobs.iteritems():
         
         inference_params, training_data, test_data = seed_jobs[4:]
         best_model_ind = -1
-        best_error = 1
+        best_training_error = 1
         model_ind = 0
         model_ind_file = "%s.%s" %(model_file, model_ind_to_s(model_ind))
         while os.path.exists(model_ind_file):          
@@ -148,19 +148,21 @@ for alg_name, alg_jobs in jobs.iteritems():
           print training_inference_job
           os.system(training_inference_job)
           training_error = float(open(training_error_file, 'r').read())
-          if training_error < best_error:
+          if training_error < best_training_error:
             best_model_ind = model_ind
-            best_error = training_error            
+            best_training_error = training_error            
           
           model_ind += 1
           model_ind_file = "%s.%s" %(model_file, model_ind_to_s(model_ind))
 
         best_model_file = "%s.%s" %(model_file, model_ind_to_s(best_model_ind))
         print "BEST MODEL: %s" %best_model_file
+        os.system("cp %s %s" %(best_model_file, "%s.best" %model_file)) # Copy best model to model.best
+        
         test_inference_job = "./svm_motif_classify %s %s %s %s"\
           %(inference_params, test_data, best_model_file, test_error_file)
         
-        print training_inference_job
+        print test_inference_job
         status = os.system(test_inference_job)
         if status:
           if 'raise_errors' in params and params['raise_errors']:
@@ -169,7 +171,7 @@ for alg_name, alg_jobs in jobs.iteritems():
             print "COMMAND FAILED: "+job_cmd
             continue
         
-        training_error = float(open(training_error_file, 'r').read())
+        training_error = best_training_error#float(open(training_error_file, 'r').read())
         test_error = float(open(test_error_file, 'r').read())
         
         prot_stats['train'].append(training_error)

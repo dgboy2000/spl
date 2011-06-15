@@ -12,8 +12,13 @@ argmax = lambda array: max(izip(array, xrange(len(array))))[1]
 argmin = lambda array: min(izip(array, xrange(len(array))))[1]
 
 print sys.argv
-assert len(sys.argv) == 2, "Correct usage is python run_batch.py [params file]"
+assert len(sys.argv) in [2,3], "Correct usage is python run_batch.py [params file] [mode]"
 execfile(sys.argv[1])
+
+if len(sys.argv) == 3 and sys.argv[2].lower() == "printonly":
+  PRINTONLY = True
+else:
+  PRINTONLY = False
 
 # make_cmd = "make clean && ./run_make"
 make_cmd = "./run_make"
@@ -76,13 +81,17 @@ for alg_name,param_pair in params['param_pairs'].iteritems():
       training_job = "./svm_bbox_learn %s %s %s %s"\
         %(training_params, training_data, training_model, training_basename)
 
+      training_labels_file = '%s.labels.train' %training_basename
+      training_latent_file = '%s.latent.train' %training_basename
       training_error_file = '%s.error.train' %training_basename
-      training_inference_job = "./svm_bbox_classify %s %s %s"\
-        %(training_data, training_model, training_error_file)
+      training_inference_job = "./svm_bbox_classify %s %s %s %s %s %s"\
+        %(inference_params, training_data, training_model, training_labels_file, training_latent_file, training_error_file)
       
+      test_labels_file = '%s.labels.test' %training_basename
+      test_latent_file = '%s.latent.test' %training_basename
       test_error_file = '%s.error.test' %training_basename
-      test_inference_job = "./svm_bbox_classify %s %s %s"\
-        %(test_data, training_model, test_error_file)
+      test_inference_job = "./svm_bbox_classify %s %s %s %s %s %s"\
+        %(inference_params, test_data, training_model, test_labels_file, test_latent_file, test_error_file)
 
       seed_jobs[seed] = [training_job, training_inference_job, test_inference_job, training_model]
 
@@ -122,8 +131,13 @@ for alg_name, alg_jobs in jobs.iteritems():
           job_cmd = ' && '.join(seed_jobs[0:3])
       except TypeError:
         import pdb; pdb.set_trace()
-      print "Executing the following command: %s\n" %job_cmd
+      print "%s\n" %job_cmd
       
+      # For DAG parallelizing: print to screen and continue
+      if PRINTONLY:
+        print "%s\n" %job_cmd
+        continue
+        
       status = os.system(job_cmd)
       if status:
         if 'raise_errors' in params and params['raise_errors']:
@@ -142,6 +156,9 @@ for alg_name, alg_jobs in jobs.iteritems():
       best_seed_stats[alg_name][fold]['train'].append(training_error)
       best_seed_stats[alg_name][fold]['test'].append(test_error)
       
+    if PRINTONLY:
+      continue
+        
     best_seed_ind = argmin(best_seed_stats[alg_name][fold]['train'])
     best_train = best_seed_stats[alg_name][fold]['train'][best_seed_ind]
     best_test = best_seed_stats[alg_name][fold]['test'][best_seed_ind]
