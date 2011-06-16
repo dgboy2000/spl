@@ -924,7 +924,7 @@ double subgradient_descent(double *w, long m, int MAX_ITER, double C, double C_s
   // printf ("Found the following first constraint:\n");
   // print_svec (new_constraint);
   
-  while(!stop_crit && iter < 20) {
+  while(!stop_crit && iter < MAX_ITER) {
     iter+=1;
     printf("."); fflush(stdout);
 
@@ -1917,7 +1917,6 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
   char filestub[1024];
 
   /* set default */
-  learn_parm->maxiter=20000;
   learn_parm->svm_maxqpsize=100;
   learn_parm->svm_c=100.0;
   learn_parm->eps=0.001;
@@ -1947,6 +1946,9 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
   struct_parm->custom_argc=0;
   /*-------------------------------------------------------------------------------*/
 
+  int maxiter_specified = 0; //flag to indicate whether the user has specified a value for learn_parm->maxiter
+  //this flag is necessary because the default value of maxiter depends on the optimizer type
+
   for(i=1;(i<argc) && ((argv[i])[0] == '-');i++) {
     switch ((argv[i])[1]) {
     case 'a': i++; struct_parm->svm_c_shannon=atof(argv[i]); break;
@@ -1958,7 +1960,7 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
     case 'i': i++; struct_parm->init_model_file=argv[i]; break;
     case 'k': i++; *init_spl_weight = atof(argv[i]); break;
     case 'm': i++; *spl_factor = atof(argv[i]); break;
-    case 'n': i++; learn_parm->maxiter=atol(argv[i]); break;
+    case 'n': i++; learn_parm->maxiter=atol(argv[i]); maxiter_specified=1; break;
     case 'o': i++; struct_parm->optimizer_type = atoi(argv[i]); break;
     case 'p': i++; learn_parm->remove_inconsistent=atol(argv[i]); break; 
     case 'r': i++; learn_parm->biased_hyperplane=atol(argv[i]); break; 
@@ -1972,6 +1974,18 @@ void my_read_input_parameters(int argc, char *argv[], char *trainfile,char* mode
     }
 
   }
+
+  /*unlike other optimization algorithms, our (non-stochastic) subgradient descent
+  algorithm is intentionally run for a limited number of iterations and in
+  most cases should be cut off before it reaches a zero-subgradient*/
+  if (!maxiter_specified) {
+    if (struct_parm->optimizer_type==2) {
+      learn_parm->maxiter=20;
+    } else {
+      learn_parm->maxiter=20000;
+    }
+  }
+
   *init_spl_weight = (*init_spl_weight) / (learn_parm->svm_c + struct_parm->svm_c_shannon);
 
   if(i>=argc) {
