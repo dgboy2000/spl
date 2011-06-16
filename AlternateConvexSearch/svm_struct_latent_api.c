@@ -877,6 +877,27 @@ void free_struct_model(STRUCTMODEL sm, STRUCT_LEARN_PARM *sparm) {
   free(sm.pattern_hash);
 }
 
+void free_cached_psis(SAMPLE s, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+  int i;
+  for (i = 0; i < s.n; ++i) {
+    free_psi_cache(s.examples[i].x, sm, sparm);
+  }
+}
+
+
+//Free feature vectors cached with pattern x
+void free_psi_cache(PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm) {
+  int j, k, numPositions;
+  numPositions = get_num_latent_variable_options (x, sm, sparm);
+  for (j = 0; j < 2; ++j) {
+    for (k = 0; k < numPositions; ++k) {
+      free_svector (x.psi_cache[j][k]);
+    }
+    free (x.psi_cache[j]);
+  }
+  free(x.psi_cache);
+}
+
 void free_pattern(PATTERN x) {
 /*
   Free any memory malloc'ed when creating pattern x. 

@@ -902,7 +902,7 @@ double subgradient_descent(double *w, long m, int MAX_ITER, double C, double C_s
  
   iter = 0;
 
-  printf("Running structural SVM solver: "); fflush(stdout); 
+  printf("Running structural SVM solver (with subgradient descent): "); fflush(stdout); 
 
   double **correct_expectation_psi, **incorrect_expectation_psi, *expectation_loss;
   correct_expectation_psi = (double **) malloc (m * sizeof (double *));
@@ -913,7 +913,7 @@ double subgradient_descent(double *w, long m, int MAX_ITER, double C, double C_s
   {
     get_y_h_probs (&ex[i].x, &ex[i].y, probscache[i], sm, sparm);
     get_expectation_psi (&ex[i].x, &ex[i].y, &correct_expectation_psi[i], &incorrect_expectation_psi[i], probscache[i], sm, sparm);
-    get_expectation_psi (&ex[i].x, &ex[i].y, &correct_expectation_psi[i], &incorrect_expectation_psi[i], probscache[i], sm, sparm);
+    //get_expectation_psi (&ex[i].x, &ex[i].y, &correct_expectation_psi[i], &incorrect_expectation_psi[i], probscache[i], sm, sparm);
     expectation_loss[i] = get_expectation_loss (&ex[i].y, probscache[i], sm, sparm);
   }
   new_constraint_shannon = find_shannon_cutting_plane(ex, correct_expectation_psi, incorrect_expectation_psi, expectation_loss, &margin_shannon, m, sm, sparm, valid_examples);
@@ -944,7 +944,7 @@ double subgradient_descent(double *w, long m, int MAX_ITER, double C, double C_s
 
     cur_obj = current_shannon_obj_val(ex, new_constraint_shannon, margin_shannon, m, sm, sparm, C_shannon);
     // printf ("Last objective is: %f\n", best_obj);
-    // printf ("Current objective is: %f\n", cur_obj);
+    printf ("Current objective is: %f\n", cur_obj);
     if (cur_obj < (best_obj - epsilon)) {
       best_obj = cur_obj;
     } else {
@@ -1889,6 +1889,7 @@ int main(int argc, char* argv[]) {
   // skip testing for the moment  
 
   /* free memory */
+  free_cached_psis(alldata, &sm, &sparm);
   free_struct_sample(alldata);
   if(ntrain < alldata.n)
   {
@@ -1896,6 +1897,7 @@ int main(int argc, char* argv[]) {
     free(val.examples);
   }
   free_struct_model(sm, &sparm);
+  free(best_w);
   for(i=0;i<m;i++) {
     free_svector(fycache[i]);
   }

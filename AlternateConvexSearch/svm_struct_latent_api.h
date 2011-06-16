@@ -50,6 +50,8 @@ void get_expectation_psi (PATTERN *x, LABEL *y, double **correct_expectation_psi
 double get_expectation_loss (LABEL *y, double **probs, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
 
 void free_struct_model(STRUCTMODEL sm, STRUCT_LEARN_PARM *sparm);
+void free_psi_cache(PATTERN x, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
+void free_cached_psis(SAMPLE s, STRUCTMODEL *sm, STRUCT_LEARN_PARM *sparm);
 void free_pattern(PATTERN x);
 void free_label(LABEL y);
 void free_latent_var(LATENT_VAR h);
@@ -60,5 +62,3 @@ int compute_hamming_distance(PATTERN x1, int h1Pos, PATTERN x2, int h2Pos, STRUC
 
 void print_latent_var(LATENT_VAR h, FILE *flatent);
 int is_equal_latent_var(LATENT_VAR h1, LATENT_VAR h2);
-
-
