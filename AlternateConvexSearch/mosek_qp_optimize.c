@@ -11,19 +11,20 @@ static void MSKAPI printstr(void *handle, char str[]) {
 
 int mosek_qp_optimize(double** G, double* delta, double* alpha, long k, double C, double C_shannon, int *slack_or_shannon, double *dual_obj) {
   long i,j,t;
-  double *c;
-  MSKlidxt *aptrb;
-  MSKlidxt *aptre;
-  MSKidxt *asub;
-  double *aval;
+  double *c = NULL; //Kevin Miller added NULL initialization (from now on, this comment will be abbreviated as "KMANI")
+  MSKlidxt *aptrb = NULL; //KMANI
+  MSKlidxt *aptre = NULL; //KMANI
+  MSKidxt *asub = NULL; //KMANI
+  double *aval = NULL; //KMANI
   MSKboundkeye bkc[2];
   double blc[2];
   double buc[2];
-  MSKboundkeye *bkx;
-  double *blx;
-  double *bux;
-  MSKidxt *qsubi,*qsubj;
-  double *qval;
+  MSKboundkeye *bkx = NULL;
+  double *blx = NULL;
+  double *bux = NULL;
+  MSKidxt *qsubi = NULL;
+  MSKidxt *qsubj = NULL;
+  double *qval = NULL;
 
   MSKenv_t env;
   MSKtask_t task;
@@ -139,7 +140,9 @@ int mosek_qp_optimize(double** G, double* delta, double* alpha, long k, double C
 	}
 	    
 	r = MSK_putqobj(task, k*(k+1)/2, qsubi,qsubj,qval);
+
       }
+      
       
 
       /* DEBUG */
@@ -196,6 +199,8 @@ int mosek_qp_optimize(double** G, double* delta, double* alpha, long k, double C
   free(qsubj);  
   free(qval);  
   
+  //printf("Got through mosek_qp_optimize().\n");
+
 	if(r == MSK_RES_OK)
   	return(0);  
 	else

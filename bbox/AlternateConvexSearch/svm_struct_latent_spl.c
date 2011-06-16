@@ -633,13 +633,12 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C,double 
     }
 
   new_constraint = find_cutting_plane(ex, fycache, &margin, m, sm, sparm,valid_examples);
-  new_constraint_shannon = find_shannon_cutting_plane(ex,correct_expectation_psi,incorrect_expectation_psi,expectation_loss, &margin_shannon, m, sm, sparm,valid_examples);
-
-  // printf ("Found the following first constraint:\n");                                                                                      
-  // print_svec (new_constraint);                                                                                                             
-
   value = margin - sprod_ns(w, new_constraint);
-  value_shannon = margin_shannon - sprod_ns(w, new_constraint_shannon);
+
+  if (C_shannon > 0.0) {
+    new_constraint_shannon = find_shannon_cutting_plane(ex,correct_expectation_psi,incorrect_expectation_psi,expectation_loss, &margin_shannon, m, sm, sparm,valid_examples);
+    value_shannon = margin_shannon - sprod_ns(w, new_constraint_shannon);
+  }
 
   // FIXME threshold_shannon                                                                                                                  
   // FIXME: shannon_cutting_plane: on an example-by-example basis, return
@@ -740,9 +739,9 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C,double 
       }
 
 
-    FILE *G_logfile = fopen ("gramm.debug.mat", "w");
-    log_matrix_for_matlab (G_logfile, G, size_active, size_active);
-    fclose (G_logfile);
+    //FILE *G_logfile = fopen ("gramm.debug.mat", "w");
+    //log_matrix_for_matlab (G_logfile, G, size_active, size_active);
+    //fclose (G_logfile);
 
     /* solve QP to update alpha */
     r = mosek_qp_optimize(G, delta, alpha, (long) size_active, C,C_shannon, slack_or_shannon, &cur_obj);
@@ -831,19 +830,16 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C,double 
   }
 
   new_constraint = find_cutting_plane(ex, fycache, &margin, m, sm, sparm,valid_examples);
-  new_constraint_shannon = find_shannon_cutting_plane(ex,correct_expectation_psi,incorrect_expectation_psi,expectation_loss, &margin_shannon,m, sm, sparm,valid_examples);
-   // printf ("Found the following constraint %d:\n", iter);                                                                                 
-   //     print_svec (new_constraint);                                                                                                       
-
-
-   value = margin - sprod_ns(w, new_constraint);
-   value_shannon = margin_shannon - sprod_ns(w, new_constraint_shannon);
-
+  value = margin - sprod_ns(w, new_constraint);
+  if (C_shannon > 0.0) {
+    new_constraint_shannon = find_shannon_cutting_plane(ex,correct_expectation_psi,incorrect_expectation_psi,expectation_loss,&margin_shannon,m, sm, sparm,valid_examples);
+    value_shannon = margin_shannon - sprod_ns(w, new_constraint_shannon);
+  }
    if((iter % CLEANUP_CHECK) == 0)
     {
       printf("+"); fflush(stdout);
       size_active = resize_cleanup(size_active, &idle, &slack_or_shannon,&alpha, &delta, &dXc, &G, &mv_iter);
-      printf("size_active = %d\n", size_active);
+      //printf("size_active = %d\n", size_active);
     }
   } // end cutting plane while loop                                                                                                         
 
@@ -854,18 +850,21 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C,double 
   /* free memory */
   for (j=0;j<size_active;j++) {
     free(G[j]);
-    free_example(dXc[j],0);
+    free_example(dXc[j],1);
   }
-  free(G);
-  free(dXc);
-  free(alpha);
-  free(delta);
-  free_svector(new_constraint);
-  // free_svector(new_constraint_shannon); 
-  free(cur_slack);
-  free(idle);
-  if (svm_model!=NULL) free_model(svm_model,0);
-  for (i=0; i<m; ++i) {
+ free(G);
+ free(dXc);
+ free(alpha);
+ free(delta);
+ free_svector(new_constraint);
+ if (C_shannon > 0.0) {
+   free_svector(new_constraint_shannon); 
+ }
+ free(slack_or_shannon);
+ free(cur_slack);
+ free(idle);
+ if (svm_model!=NULL) free_model(svm_model,0);
+ for (i=0; i<m; ++i) {
   free (correct_expectation_psi[i]);
   free (incorrect_expectation_psi[i]);
  }
@@ -1731,12 +1730,13 @@ int main(int argc, char* argv[]) {
 
 	/* write structural model */
 	/*---COMMENT OUT WHEN RUNNING TESTS!!!---*/
-        memcpy (sm.w, best_w, sm.sizePsi+1); // make sure the best model is the one that gets written to disk   
+        //memcpy (sm.w, best_w, sm.sizePsi+1); // make sure the best model is the one that gets written to disk   
 	/*---------------------*/
        write_struct_model(modelfile, &sm, &sparm);
   // skip testing for the moment  
 
   /* free memory */
+  free(best_w);
   free_struct_sample(alldata);
 	if(ntrain < alldata.n)
 	{
@@ -1884,7 +1884,7 @@ int resize_cleanup(int size_active, int **ptr_idle, int**ptr_slack_or_shannon, d
       free(G[i]);
       G[i] = G[j];
       G[j] = NULL;
-      free_example(dXc[i],0);
+      free_example(dXc[i],1);
       dXc[i] = dXc[j];
       dXc[j] = NULL;
       if(j == *mv_iter)
@@ -1896,7 +1896,7 @@ int resize_cleanup(int size_active, int **ptr_idle, int**ptr_slack_or_shannon, d
   }
   for (k=i;k<size_active;k++) {
     if (G[k]!=NULL) free(G[k]);
-    if (dXc[k]!=NULL) free_example(dXc[k],0);
+    if (dXc[k]!=NULL) free_example(dXc[k],1);
   }
   *mv_iter = new_mv_iter;
   new_size_active = i;

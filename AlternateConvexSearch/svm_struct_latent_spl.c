@@ -601,13 +601,13 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
   }
 
   new_constraint = find_cutting_plane(ex, fycache, &margin, m, sm, sparm, valid_examples);
-  new_constraint_shannon = find_shannon_cutting_plane(ex, correct_expectation_psi, incorrect_expectation_psi, expectation_loss, &margin_shannon, m, sm, sparm, valid_examples);
-  
-  // printf ("Found the following first constraint:\n");
-  // print_svec (new_constraint);
-  
   value = margin - sprod_ns(w, new_constraint);
-  value_shannon = margin_shannon - sprod_ns(w, new_constraint_shannon);
+
+  if (C_shannon > 0.0) {
+    new_constraint_shannon = find_shannon_cutting_plane(ex, correct_expectation_psi, incorrect_expectation_psi, expectation_loss, &margin_shannon, m, sm, sparm, valid_examples);
+    value_shannon = margin_shannon - sprod_ns(w, new_constraint_shannon);  
+  }
+  
   
   // FIXME threshold_shannon
   // FIXME: shannon_cutting_plane: on an example-by-example basis, return a null constraint if the sample's constraint it satisfied.
@@ -788,13 +788,11 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
     }
 
     new_constraint = find_cutting_plane(ex, fycache, &margin, m, sm, sparm, valid_examples);
-    new_constraint_shannon = find_shannon_cutting_plane(ex, correct_expectation_psi, incorrect_expectation_psi, expectation_loss, &margin_shannon, m, sm, sparm, valid_examples);
-    // printf ("Found the following constraint %d:\n", iter);
-    //     print_svec (new_constraint);
-    
-    
     value = margin - sprod_ns(w, new_constraint);
-    value_shannon = margin_shannon - sprod_ns(w, new_constraint_shannon);
+    if (C_shannon > 0.0) {
+      new_constraint_shannon = find_shannon_cutting_plane(ex, correct_expectation_psi, incorrect_expectation_psi, expectation_loss, &margin_shannon, m, sm, sparm, valid_examples);
+      value_shannon = margin_shannon - sprod_ns(w, new_constraint_shannon);
+    }
 
     if((iter % CLEANUP_CHECK) == 0)
     {
@@ -811,15 +809,17 @@ double cutting_plane_algorithm(double *w, long m, int MAX_ITER, double C, double
   /* free memory */
   for (j=0;j<size_active;j++) {
     free(G[j]);
-    free_example(dXc[j],0); 
+    free_example(dXc[j],1); 
   }
   free(G);
   free(dXc);
   free(alpha);
   free(delta);
   free_svector(new_constraint);
-  if (C_shannon)
+  if (C_shannon > 0.0) {
     free_svector(new_constraint_shannon);
+  }
+  free(slack_or_shannon);
   free(cur_slack);
   free(idle);
   if (svm_model!=NULL) free_model(svm_model,0);
@@ -2050,7 +2050,7 @@ int resize_cleanup(int size_active, int **ptr_idle, int **ptr_slack_or_shannon, 
     free(G[i]);
     G[i] = G[j];
     G[j] = NULL;
-    free_example(dXc[i],0);
+    free_example(dXc[i],1);
     dXc[i] = dXc[j];
     dXc[j] = NULL;
     if(j == *mv_iter)
@@ -2062,7 +2062,7 @@ int resize_cleanup(int size_active, int **ptr_idle, int **ptr_slack_or_shannon, 
   }
   for (k=i;k<size_active;k++) {
     if (G[k]!=NULL) free(G[k]);
-    if (dXc[k]!=NULL) free_example(dXc[k],0);
+    if (dXc[k]!=NULL) free_example(dXc[k],1);
   }
   *mv_iter = new_mv_iter;
   new_size_active = i;
