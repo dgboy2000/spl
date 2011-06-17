@@ -1,3 +1,4 @@
+#!/bin/bash
 make clean
 
 if [ $HOME == "/Users/dannygoodman" ]; then

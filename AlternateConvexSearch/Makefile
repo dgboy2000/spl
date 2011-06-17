@@ -27,7 +27,7 @@ svm_motif_learn: svm_struct_latent_spl.o svm_common.o mosek_qp_optimize.o svm_st
 	$(LD) $(LDFLAGS) svm_struct_latent_spl.o svm_common.o mosek_qp_optimize.o mosek_api.o SFMT.o svm_struct_latent_api.o debug.o svm_struct_latent_utils.o -o svm_motif_learn $(LIBS) -L$(MSKLIBPATH) $(MSKLINKFLAGS)
 
 svm_motif_classify: svm_struct_latent_classify.o svm_common.o svm_struct_latent_api.o SFMT.o svm_struct_latent_utils.o
-	$(LD) $(LDFLAGS) svm_struct_latent_classify.o svm_common.o SFMT.o svm_struct_latent_api.o svm_struct_latent_utils.o -o svm_motif_classify $(LIBS)
+	$(LD) $(LDFLAGS) svm_struct_latent_classify.o svm_common.o SFMT.o svm_struct_latent_api.o svm_struct_latent_utils.o -o svm_motif_classify $(LIBS) #-L$(MSKLIBPATH) $(MSKLINKFLAGS)
 
 test_mosek: test_mosek.o SFMT.o mosek_api.o
 	$(LD) $(LDFLAGS) test_mosek.o mosek_api.o SFMT.o -o test_mosek $(LIBS) -L$(MSKLIBPATH) $(MSKLINKFLAGS)
